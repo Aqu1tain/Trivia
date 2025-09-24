@@ -2,7 +2,7 @@ import { EmbedBuilder, SlashCommandBuilder } from 'discord.js';
 
 import { obtenirGestionnaireQuestions } from '../core/gestionnaire-questions';
 import { CLE_GUILDE_LEGACY, NIVEAUX_QUESTIONS, type StatutParticipation } from '../services/questions-du-jour';
-import dayjs from '../utils/date';
+import { dayjs } from '../utils/date';
 import { journalPrincipal } from '../utils/journalisation';
 
 import type { Commande } from './types';

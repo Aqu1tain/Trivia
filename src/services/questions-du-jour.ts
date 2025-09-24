@@ -1,5 +1,4 @@
-import dayjs from '../utils/date';
-
+import { dayjs } from '../utils/date';
 import { journalPrincipal } from '../utils/journalisation';
 
 import type { NiveauDifficulte, ParametresRecherche, QuestionTrivia, QuizzApiClient } from './quizzapi';

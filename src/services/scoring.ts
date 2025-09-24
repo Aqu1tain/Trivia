@@ -1,4 +1,4 @@
-import dayjs from '../utils/date';
+import { dayjs } from '../utils/date';
 
 import type { NiveauQuestion } from './questions-du-jour';
 

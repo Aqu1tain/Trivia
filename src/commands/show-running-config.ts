@@ -2,7 +2,7 @@ import { EmbedBuilder, PermissionFlagsBits, SlashCommandBuilder } from 'discord.
 
 import { obtenirConfiguration } from '../config/environnement';
 import { obtenirConfigurationGuilde } from '../core/configuration-guildes';
-import dayjs from '../utils/date';
+import { dayjs } from '../utils/date';
 
 import type { Commande } from './types';
 

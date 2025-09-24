@@ -1,4 +1,3 @@
-import dayjs from '../utils/date';
 import {
   ActionRowBuilder,
   ButtonInteraction,
@@ -10,13 +9,13 @@ import {
 } from 'discord.js';
 
 import { mettreAJourAnnonceQuestions } from '../bot/scheduler';
-import { obtenirConfigurationGuilde } from '../core/configuration-guildes';
 import { obtenirServiceClassements, sauvegarderClassementsActuels } from '../core/classements';
+import { obtenirConfigurationGuilde } from '../core/configuration-guildes';
 import { obtenirGestionnaireQuestions } from '../core/gestionnaire-questions';
-import type { NiveauQuestion, QuestionsDuJour } from '../services/questions-du-jour';
+import { type NiveauQuestion, type QuestionsDuJour } from '../services/questions-du-jour';
 import { calculerPoints } from '../services/scoring';
-import { obtenirSession } from '../services/sessions';
-import type { SessionQuotidienne } from '../services/sessions';
+import { obtenirSession, type SessionQuotidienne } from '../services/sessions';
+import { dayjs } from '../utils/date';
 import { journalPrincipal } from '../utils/journalisation';
 
 interface AnalyseBouton {

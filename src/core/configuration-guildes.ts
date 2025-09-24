@@ -1,10 +1,10 @@
-import dayjs from '../utils/date';
 import {
   lireConfigurationsGuildes,
   sauvegarderConfigurationsGuildes,
   type GuildConfigurationSnapshot,
   type GuildConfigurationsSnapshot,
 } from '../storage/guilds';
+import { dayjs } from '../utils/date';
 
 export interface ConfigurationGuilde {
   guildId: string;

@@ -37,5 +37,3 @@ export function dayjsDansFuseau(date: ConfigType, timezone: string, format?: str
 }
 
 export type { Dayjs };
-
-export default dayjs;

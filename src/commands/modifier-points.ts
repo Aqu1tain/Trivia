@@ -1,9 +1,9 @@
 import { PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
 
-import { obtenirConfigurationGuilde } from '../core/configuration-guildes';
 import { obtenirServiceClassements, sauvegarderClassementsActuels } from '../core/classements';
+import { obtenirConfigurationGuilde } from '../core/configuration-guildes';
 import type { TypeClassement } from '../score/classement-service';
-import dayjs from '../utils/date';
+import { dayjs } from '../utils/date';
 
 import type { Commande } from './types';
 

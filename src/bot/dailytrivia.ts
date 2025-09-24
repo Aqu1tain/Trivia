@@ -1,4 +1,3 @@
-import dayjs, { type Dayjs } from '../utils/date';
 import {
   ChannelType,
   ChatInputCommandInteraction,
@@ -8,17 +7,19 @@ import {
   GatewayIntentBits,
   Interaction,
   PermissionFlagsBits,
+  type Guild,
 } from 'discord.js';
 
 import { commandesDisponibles } from '../commands';
 import type { Commande } from '../commands/types';
 import { obtenirConfiguration } from '../config/environnement';
 import { traiterBoutonQuestion } from '../interactions/question-buttons';
+import { dayjs, type Dayjs } from '../utils/date';
 import { journalPrincipal } from '../utils/journalisation';
 
 import { annoncerClassementFinDeJournee, traiterSelectionClassement } from './leaderboard-announcer';
-import { enregistrerPlanificateur } from './scheduler-registry';
 import { PlanificateurAnnonceQuotidienne, estBoutonQuestion } from './scheduler';
+import { enregistrerPlanificateur } from './scheduler-registry';
 
 export type RegistreCommandes = Collection<string, Commande>;
 
@@ -55,40 +56,44 @@ export function creerClient(): Client {
     void gererInteraction(interaction, registre);
   });
 
-  client.on(Events.GuildCreate, async (guild) => {
-    journalPrincipal.info('Nouveau serveur rejoint', {
-      guildId: guild.id,
-      nom: guild.name,
-    });
-
-    const membre = guild.members.me;
-    const cible =
-      guild.systemChannel ??
-      guild.channels.cache
-        .filter((channel) => {
-          if (channel.type !== ChannelType.GuildText) {
-            return false;
-          }
-          if (!membre) {
-            return true;
-          }
-          const permissions = channel.permissionsFor(membre);
-          return permissions ? permissions.has(PermissionFlagsBits.SendMessages) : false;
-        })
-        .first();
-
-    if (cible && cible.isTextBased()) {
-      await cible
-        .send(
-          'Merci de m’avoir ajouté ! Utilise la commande `/config` pour choisir le salon de publication et l’heure française souhaitée.',
-        )
-        .catch(() => {
-          /* noop */
-        });
-    }
+  client.on(Events.GuildCreate, (guild) => {
+    void notifierArriveeSurGuilde(guild);
   });
 
   return client;
+}
+
+async function notifierArriveeSurGuilde(guild: Guild): Promise<void> {
+  journalPrincipal.info('Nouveau serveur rejoint', {
+    guildId: guild.id,
+    nom: guild.name,
+  });
+
+  const membre = guild.members.me;
+  const cible =
+    guild.systemChannel ??
+    guild.channels.cache
+      .filter((channel) => {
+        if (channel.type !== ChannelType.GuildText) {
+          return false;
+        }
+        if (!membre) {
+          return true;
+        }
+        const permissions = channel.permissionsFor(membre);
+        return permissions ? permissions.has(PermissionFlagsBits.SendMessages) : false;
+      })
+      .first();
+
+  if (cible && cible.isTextBased()) {
+    await cible
+      .send(
+        'Merci de m’avoir ajouté ! Utilise la commande `/config` pour choisir le salon de publication et l’heure française souhaitée.',
+      )
+      .catch(() => {
+        /* noop */
+      });
+  }
 }
 
 async function executerCommande(

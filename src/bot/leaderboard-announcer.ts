@@ -1,4 +1,3 @@
-import dayjs from '../utils/date';
 import {
   ActionRowBuilder,
   Client,
@@ -8,10 +7,11 @@ import {
   TextChannel,
 } from 'discord.js';
 
+import { obtenirServiceClassements } from '../core/classements';
 import type { ConfigurationGuilde } from '../core/configuration-guildes';
 import { listerConfigurationsGuildes } from '../core/configuration-guildes';
-import { obtenirServiceClassements } from '../core/classements';
 import type { TypeClassement } from '../score/classement-service';
+import { dayjs } from '../utils/date';
 import { journalPrincipal } from '../utils/journalisation';
 
 const TYPES: TypeClassement[] = ['quotidien', 'hebdomadaire', 'mensuel', 'global'];

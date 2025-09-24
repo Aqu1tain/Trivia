@@ -1,4 +1,3 @@
-import dayjs, { dayjsDansFuseau } from '../utils/date';
 import type { APIEmbed } from 'discord.js';
 import {
   ActionRowBuilder,
@@ -13,15 +12,19 @@ import {
 import type { ConfigurationGuilde } from '../core/configuration-guildes';
 import { listerConfigurationsGuildes } from '../core/configuration-guildes';
 import { obtenirGestionnaireQuestions } from '../core/gestionnaire-questions';
-import type { QuestionsDuJour } from '../services/questions-du-jour';
-import { CLE_GUILDE_LEGACY, NIVEAUX_QUESTIONS } from '../services/questions-du-jour';
-import type { ParticipationQuestion } from '../services/questions-du-jour';
+import {
+  CLE_GUILDE_LEGACY,
+  NIVEAUX_QUESTIONS,
+  type ParticipationQuestion,
+  type QuestionsDuJour,
+} from '../services/questions-du-jour';
 import {
   enregistrerSession,
   obtenirSessionPourDate,
   supprimerSessionPourDate,
   type SessionQuotidienne,
 } from '../services/sessions';
+import { dayjs, dayjsDansFuseau } from '../utils/date';
 import { journalPrincipal } from '../utils/journalisation';
 
 const PREFIX_CUSTOM_ID = 'question';

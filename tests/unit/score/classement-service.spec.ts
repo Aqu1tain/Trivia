@@ -1,5 +1,5 @@
 import { ServiceClassements } from '../../../src/score/classement-service';
-import dayjs from '../../../src/utils/date';
+import { dayjs } from '../../../src/utils/date';
 
 describe('ServiceClassements', () => {
   it('agrège les points par utilisateur', () => {

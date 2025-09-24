@@ -1,8 +1,8 @@
 import { ChannelType, PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
 
+import { obtenirPlanificateur } from '../bot/scheduler-registry';
 import { obtenirConfiguration } from '../config/environnement';
 import { definirConfigurationGuilde } from '../core/configuration-guildes';
-import { obtenirPlanificateur } from '../bot/scheduler-registry';
 
 import type { Commande } from './types';
 

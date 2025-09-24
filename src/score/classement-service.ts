@@ -1,4 +1,4 @@
-import dayjs, { dayjsDansFuseau, type Dayjs } from '../utils/date';
+import { dayjs, dayjsDansFuseau, type Dayjs } from '../utils/date';
 
 export type TypeClassement = 'quotidien' | 'hebdomadaire' | 'mensuel' | 'global';
 
@@ -78,7 +78,11 @@ export class ServiceClassements {
     return Array.from(classementGuilde.values())
       .sort((a, b) => b.points - a.points)
       .slice(0, limite)
-      .map(({ periodeCle: _, ...publicEntree }) => publicEntree);
+      .map((entree) => ({
+        utilisateurId: entree.utilisateurId,
+        points: entree.points,
+        derniereMiseAJour: entree.derniereMiseAJour,
+      }));
   }
 
   public obtenirScoreUtilisateur(type: TypeClassement, guildId: string, utilisateurId: string): EntreeClassement | null {
@@ -105,8 +109,11 @@ export class ServiceClassements {
       }
     }
 
-    const { periodeCle: _, ...restant } = entree;
-    return restant;
+    return {
+      utilisateurId: entree.utilisateurId,
+      points: entree.points,
+      derniereMiseAJour: entree.derniereMiseAJour,
+    };
   }
 
   public toSnapshot(): ClassementsSnapshot {

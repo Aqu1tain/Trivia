@@ -1,10 +1,10 @@
-import dayjs from '../utils/date';
 import {
   lireSessionsState,
   sauvegarderSessionsState,
   resetSessionsState,
   type SessionSnapshotEntry,
 } from '../storage/sessions-store';
+import { dayjs } from '../utils/date';
 
 type CleQuotidienne = string;
 

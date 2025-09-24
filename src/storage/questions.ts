@@ -12,17 +12,22 @@ const NIVEAUX: NiveauQuestion[] = ['facile', 'moyen', 'difficile'];
 
 let cache: QuestionsSnapshot | null = null;
 
-type ParticipantsBruts = Record<
-  string,
-  {
-    reponse?: unknown;
-    statut?: unknown;
-    reponduLe?: unknown;
-  }
->;
-
 function estStatutParticipation(valeur: unknown): valeur is StatutParticipation {
   return valeur === 'correct' || valeur === 'incorrect' || valeur === 'timeout';
+}
+
+function estRecord(valeur: unknown): valeur is Record<string, unknown> {
+  return typeof valeur === 'object' && valeur !== null;
+}
+
+function lireString(source: Record<string, unknown>, cle: string): string | null {
+  const valeur = source[cle];
+  return typeof valeur === 'string' ? valeur : null;
+}
+
+function lireRecord(source: Record<string, unknown>, cle: string): Record<string, unknown> | null {
+  const valeur = source[cle];
+  return estRecord(valeur) ? valeur : null;
 }
 
 function normaliserParticipants(
@@ -49,17 +54,17 @@ function normaliserParticipants(
     return resultat;
   }
 
-  if (typeof valeur !== 'object' || valeur === null) {
+  if (!estRecord(valeur)) {
     return resultat;
   }
 
-  const brut = valeur as Record<string, unknown>;
+  const brut = valeur;
   const estLegacy = Object.values(brut).every((entree) =>
-    typeof entree === 'object' && entree !== null && !Array.isArray(entree) && 'statut' in (entree as object),
+    estRecord(entree) && !Array.isArray(entree) && 'statut' in entree,
   );
 
   if (estLegacy) {
-    const participants = normaliserParticipantsSimples(brut as ParticipantsBruts, repliDate);
+    const participants = normaliserParticipantsSimples(brut, repliDate);
     if (Object.keys(participants).length > 0) {
       resultat[CLE_GUILDE_LEGACY] = participants;
     }
@@ -67,11 +72,11 @@ function normaliserParticipants(
   }
 
   for (const [guildId, participationsGuild] of Object.entries(brut)) {
-    if (typeof participationsGuild !== 'object' || participationsGuild === null) {
+    if (!estRecord(participationsGuild)) {
       continue;
     }
 
-    const participants = normaliserParticipantsSimples(participationsGuild as ParticipantsBruts, repliDate);
+    const participants = normaliserParticipantsSimples(participationsGuild, repliDate);
     if (Object.keys(participants).length > 0) {
       resultat[guildId] = participants;
     }
@@ -81,18 +86,20 @@ function normaliserParticipants(
 }
 
 function normaliserParticipantsSimples(
-  valeur: ParticipantsBruts,
+  valeur: Record<string, unknown>,
   repliDate: string,
 ): Record<string, { reponse: string | null; statut: StatutParticipation; reponduLe: string }> {
   const resultat: Record<string, { reponse: string | null; statut: StatutParticipation; reponduLe: string }> = {};
   for (const [identifiant, participation] of Object.entries(valeur)) {
-    if (typeof participation !== 'object' || participation === null) {
+    if (!estRecord(participation)) {
       continue;
     }
 
-    const reponse = typeof participation.reponse === 'string' ? participation.reponse : null;
-    const statut = estStatutParticipation(participation.statut) ? participation.statut : 'incorrect';
-    const reponduLe = typeof participation.reponduLe === 'string' ? participation.reponduLe : repliDate;
+    const reponse = lireString(participation, 'reponse');
+    const statutBrut = participation['statut'];
+    const statut = estStatutParticipation(statutBrut) ? statutBrut : 'incorrect';
+    const reponduLeBrut = lireString(participation, 'reponduLe');
+    const reponduLe = reponduLeBrut ?? repliDate;
 
     resultat[identifiant] = {
       reponse,
@@ -111,31 +118,31 @@ function ensureDirectoryExists(filePath: string): void {
 }
 
 function normaliserQuestionTrivia(value: unknown, niveau: NiveauQuestion): QuestionTrivia | null {
-  if (typeof value !== 'object' || value === null) {
+  if (!estRecord(value)) {
     return null;
   }
 
-  const question = value as Partial<QuestionTrivia>;
-  if (
-    typeof question.id !== 'string' ||
-    typeof question.question !== 'string' ||
-    typeof question.reponse !== 'string' ||
-    typeof question.categorie !== 'string'
-  ) {
+  const id = lireString(value, 'id');
+  const questionTexte = lireString(value, 'question');
+  const reponse = lireString(value, 'reponse');
+  const categorie = lireString(value, 'categorie');
+
+  if (!id || !questionTexte || !reponse || !categorie) {
     return null;
   }
 
   const resultat: QuestionTrivia = {
-    id: question.id,
-    question: question.question,
-    reponse: question.reponse,
-    categorie: question.categorie,
+    id,
+    question: questionTexte,
+    reponse,
+    categorie,
     difficulte: niveau,
     propositions: [],
   };
 
-  if (Array.isArray(question.propositions)) {
-    resultat.propositions = question.propositions.filter(
+  const propositions = value.propositions;
+  if (Array.isArray(propositions)) {
+    resultat.propositions = propositions.filter(
       (proposition): proposition is string => typeof proposition === 'string',
     );
   }
@@ -145,26 +152,20 @@ function normaliserQuestionTrivia(value: unknown, niveau: NiveauQuestion): Quest
 
 function normaliserQuestions(value: unknown): QuestionsSnapshot {
   const resultat: QuestionsSnapshot = {};
-  if (typeof value !== 'object' || value === null) {
+  if (!estRecord(value)) {
     return resultat;
   }
 
-  const brut = value as Record<string, unknown>;
+  const brut = value;
   for (const [date, entree] of Object.entries(brut)) {
-    if (typeof entree !== 'object' || entree === null) {
+    if (!estRecord(entree)) {
       continue;
     }
 
-    const entreeBrute = entree as {
-      genereLe?: unknown;
-      niveau?: Record<string, unknown>;
-    };
+    const genereLe = lireString(entree, 'genereLe') ?? new Date().toISOString();
 
-    const genereLe =
-      typeof entreeBrute.genereLe === 'string' ? entreeBrute.genereLe : new Date().toISOString();
-
-    const niveauxBruts = entreeBrute.niveau;
-    if (!niveauxBruts || typeof niveauxBruts !== 'object') {
+    const niveauxBruts = lireRecord(entree, 'niveau');
+    if (!niveauxBruts) {
       continue;
     }
 
@@ -172,8 +173,8 @@ function normaliserQuestions(value: unknown): QuestionsSnapshot {
 
     let valide = true;
     for (const niveau of NIVEAUX) {
-      const brutNiveau = niveauxBruts[niveau] as { question?: unknown; participants?: unknown } | undefined;
-      if (!brutNiveau) {
+      const brutNiveau = niveauxBruts[niveau];
+      if (!estRecord(brutNiveau)) {
         valide = false;
         break;
       }
