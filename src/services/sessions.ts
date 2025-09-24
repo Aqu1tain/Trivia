@@ -1,4 +1,4 @@
-import dayjs from 'dayjs';
+import dayjs from '../utils/date';
 
 type CleQuotidienne = string;
 

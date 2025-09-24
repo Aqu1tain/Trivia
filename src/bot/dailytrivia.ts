@@ -1,5 +1,4 @@
-import type { Dayjs } from 'dayjs';
-import dayjs from 'dayjs';
+import dayjs, { type Dayjs } from '../utils/date';
 import {
   ChatInputCommandInteraction,
   Client,
@@ -79,7 +78,7 @@ async function gererInteraction(interaction: Interaction, registre: RegistreComm
     }
   }
 
-  if (interaction.isStringSelectMenu() && interaction.customId === 'lb-select') {
+  if (interaction.isStringSelectMenu() && interaction.customId.startsWith('lb-select')) {
     await traiterSelectionClassement(interaction);
     return;
   }

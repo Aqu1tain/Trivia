@@ -45,7 +45,11 @@ describe('GestionnaireQuestionsDuJour', () => {
     await gestionnaire.obtenirJeuPour(date);
 
     expect(gestionnaire.aDejaRepondu(date, 'facile', 'user1')).toBe(false);
-    gestionnaire.enregistrerParticipation(date, 'facile', 'user1');
+    gestionnaire.enregistrerParticipation(date, 'facile', 'user1', {
+      reponse: 'Réponse',
+      statut: 'correct',
+      reponduLe: new Date().toISOString(),
+    });
     expect(gestionnaire.aDejaRepondu(date, 'facile', 'user1')).toBe(true);
   });
 

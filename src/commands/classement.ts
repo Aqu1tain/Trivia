@@ -1,6 +1,6 @@
-import { EmbedBuilder, SlashCommandBuilder } from 'discord.js';
+import { SlashCommandBuilder } from 'discord.js';
 
-import { obtenirServiceClassements } from '../core/classements';
+import { construireMenu, genererEmbedClassement } from '../bot/leaderboard-announcer';
 import { journalPrincipal } from '../utils/journalisation';
 
 import type { Commande } from './types';
@@ -31,37 +31,25 @@ export const commandeClassement: Commande = {
         .setMaxValue(25)
         .setRequired(false),
     )
+    .addBooleanOption((option) =>
+      option
+        .setName('prive')
+        .setDescription('Affiche le résultat uniquement pour toi')
+        .setRequired(false),
+    )
     .setDMPermission(false),
   executer: async (interaction) => {
     const type = (interaction.options.getString('type') ?? 'global') as (typeof TYPES_DISPONIBLES)[number]['name'];
     const limite = interaction.options.getInteger('limite') ?? 10;
-    const service = obtenirServiceClassements();
-
+    const prive = interaction.options.getBoolean('prive') ?? false;
     try {
-      const top = service.obtenirTop(type, limite);
-
-      if (top.length === 0) {
-        await interaction.reply({
-          content: `Aucun point enregistré pour le classement ${type}.`,
-          ephemeral: true,
-        });
-        return;
-      }
-
-      const lignes = top
-        .map((entree, index) => `${placeEmoji(index)} <@${entree.utilisateurId}> — **${entree.points} pts**`)
-        .join('\n');
-
-      const embed = new EmbedBuilder()
-        .setTitle(`🏆 ${titreComplet(type)}`)
-        .setDescription(lignes)
-        .setColor(0x9b59b6)
-        .setFooter({ text: `Limitée aux ${limite} premiers résultats` })
-        .setTimestamp(new Date());
+      const embed = genererEmbedClassement(type, limite);
+      const menu = construireMenu(type, { ownerId: interaction.user.id, limite });
 
       await interaction.reply({
         embeds: [embed],
-        ephemeral: true,
+        components: [menu],
+        ephemeral: prive,
       });
     } catch (erreur) {
       journalPrincipal.erreur('Erreur lors de la consultation du classement', erreur);
@@ -72,31 +60,3 @@ export const commandeClassement: Commande = {
     }
   },
 };
-
-function placeEmoji(position: number): string {
-  switch (position) {
-    case 0:
-      return '🥇';
-    case 1:
-      return '🥈';
-    case 2:
-      return '🥉';
-    default:
-      return `#${position + 1}`;
-  }
-}
-
-function titreComplet(type: string): string {
-  switch (type) {
-    case 'quotidien':
-      return 'Classement quotidien';
-    case 'hebdomadaire':
-      return 'Classement hebdomadaire';
-    case 'mensuel':
-      return 'Classement mensuel';
-    case 'global':
-      return 'Classement global';
-    default:
-      return 'Classement';
-  }
-}

@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 
-import type { NiveauQuestion, QuestionsSnapshot } from '../services/questions-du-jour';
+import type { NiveauQuestion, QuestionsSnapshot, StatutParticipation } from '../services/questions-du-jour';
 import type { QuestionTrivia } from '../services/quizzapi';
 import { journalPrincipal } from '../utils/journalisation';
 
@@ -11,6 +11,59 @@ const QUESTIONS_PATH = process.env.QUESTIONS_STORE_PATH ?? path.join(DATA_DIRECT
 const NIVEAUX: NiveauQuestion[] = ['facile', 'moyen', 'difficile'];
 
 let cache: QuestionsSnapshot | null = null;
+
+type ParticipantsBruts = Record<
+  string,
+  {
+    reponse?: unknown;
+    statut?: unknown;
+    reponduLe?: unknown;
+  }
+>;
+
+function estStatutParticipation(valeur: unknown): valeur is StatutParticipation {
+  return valeur === 'correct' || valeur === 'incorrect' || valeur === 'timeout';
+}
+
+function normaliserParticipants(
+  valeur: unknown,
+  repliDate: string,
+): Record<string, { reponse: string | null; statut: StatutParticipation; reponduLe: string }> {
+  const resultat: Record<string, { reponse: string | null; statut: StatutParticipation; reponduLe: string }> = {};
+
+  if (Array.isArray(valeur)) {
+    for (const participant of valeur) {
+      if (typeof participant !== 'string') {
+        continue;
+      }
+      resultat[participant] = {
+        reponse: null,
+        statut: 'timeout',
+        reponduLe: repliDate,
+      };
+    }
+    return resultat;
+  }
+
+  if (typeof valeur !== 'object' || valeur === null) {
+    return resultat;
+  }
+
+  const brut = valeur as ParticipantsBruts;
+  for (const [identifiant, participation] of Object.entries(brut)) {
+    const reponse = typeof participation.reponse === 'string' ? participation.reponse : null;
+    const statut = estStatutParticipation(participation.statut) ? participation.statut : 'incorrect';
+    const reponduLe = typeof participation.reponduLe === 'string' ? participation.reponduLe : repliDate;
+
+    resultat[identifiant] = {
+      reponse,
+      statut,
+      reponduLe,
+    };
+  }
+
+  return resultat;
+}
 
 function ensureDirectoryExists(filePath: string): void {
   const dir = path.dirname(filePath);
@@ -93,9 +146,7 @@ function normaliserQuestions(value: unknown): QuestionsSnapshot {
         break;
       }
 
-      const participants = Array.isArray(brutNiveau.participants)
-        ? brutNiveau.participants.filter((participant): participant is string => typeof participant === 'string')
-        : [];
+      const participants = normaliserParticipants(brutNiveau.participants, genereLe);
 
       niveauNormalise[niveau] = {
         question,
@@ -124,15 +175,30 @@ function cloneQuestions(snapshot: QuestionsSnapshot): QuestionsSnapshot {
       niveau: {
         facile: {
           question: { ...entree.niveau.facile.question },
-          participants: [...entree.niveau.facile.participants],
+          participants: Object.fromEntries(
+            Object.entries(entree.niveau.facile.participants).map(([id, participation]) => [
+              id,
+              { ...participation },
+            ]),
+          ),
         },
         moyen: {
           question: { ...entree.niveau.moyen.question },
-          participants: [...entree.niveau.moyen.participants],
+          participants: Object.fromEntries(
+            Object.entries(entree.niveau.moyen.participants).map(([id, participation]) => [
+              id,
+              { ...participation },
+            ]),
+          ),
         },
         difficile: {
           question: { ...entree.niveau.difficile.question },
-          participants: [...entree.niveau.difficile.participants],
+          participants: Object.fromEntries(
+            Object.entries(entree.niveau.difficile.participants).map(([id, participation]) => [
+              id,
+              { ...participation },
+            ]),
+          ),
         },
       },
     };

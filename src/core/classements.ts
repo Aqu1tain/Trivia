@@ -28,7 +28,7 @@ function initialiserDepuisSnapshot(service: ServiceClassements, snapshot: Classe
       if (!estEntreeClassement(entree) || entree.points <= 0) {
         continue;
       }
-      service.ajouterScore(type, entree.utilisateurId, entree.points);
+      service.ajouterScore(type, entree.utilisateurId, entree.points, new Date(entree.derniereMiseAJour));
     }
   }
 }

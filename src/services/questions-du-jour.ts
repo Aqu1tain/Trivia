@@ -1,4 +1,4 @@
-import dayjs from 'dayjs';
+import dayjs from '../utils/date';
 
 import { journalPrincipal } from '../utils/journalisation';
 
@@ -6,9 +6,17 @@ import type { NiveauDifficulte, ParametresRecherche, QuestionTrivia, QuizzApiCli
 
 export type NiveauQuestion = Extract<NiveauDifficulte, 'facile' | 'moyen' | 'difficile'>;
 
+export type StatutParticipation = 'correct' | 'incorrect' | 'timeout';
+
+export interface ParticipationQuestion {
+  reponse: string | null;
+  statut: StatutParticipation;
+  reponduLe: string;
+}
+
 export interface EtatQuestionDuJour {
   question: QuestionTrivia;
-  participants: Set<string>;
+  participants: Map<string, ParticipationQuestion>;
 }
 
 export interface QuestionsDuJour {
@@ -23,7 +31,14 @@ export interface QuestionSnapshotEntry {
     NiveauQuestion,
     {
       question: QuestionTrivia;
-      participants: string[];
+      participants: Record<
+        string,
+        {
+          reponse: string | null;
+          statut: StatutParticipation;
+          reponduLe: string;
+        }
+      >;
     }
   >;
 }
@@ -68,14 +83,19 @@ export class GestionnaireQuestionsDuJour {
     return jeu.niveau[niveau].participants.has(utilisateurId);
   }
 
-  public enregistrerParticipation(date: Date, niveau: NiveauQuestion, utilisateurId: string): void {
+  public enregistrerParticipation(
+    date: Date,
+    niveau: NiveauQuestion,
+    utilisateurId: string,
+    participation: ParticipationQuestion,
+  ): void {
     const cle = this.normaliserDate(date);
     const jeu = this.cache.get(cle);
     if (!jeu) {
       throw new Error(`Questions du ${cle} introuvables.`);
     }
 
-    jeu.niveau[niveau].participants.add(utilisateurId);
+    jeu.niveau[niveau].participants.set(utilisateurId, participation);
     this.notifierChangement();
   }
 
@@ -89,7 +109,7 @@ export class GestionnaireQuestionsDuJour {
     const niveaux = await Promise.all(
       NIVEAUX_QUESTIONS.map(async (niveau) => {
         const question = await this.recupererQuestionPourNiveau(niveau);
-        return [niveau, { question, participants: new Set<string>() }] as const;
+        return [niveau, { question, participants: new Map<string, ParticipationQuestion>() }] as const;
       }),
     );
 
@@ -138,15 +158,42 @@ export class GestionnaireQuestionsDuJour {
         niveau: {
           facile: {
             question: valeur.niveau.facile.question,
-            participants: Array.from(valeur.niveau.facile.participants),
+            participants: Object.fromEntries(
+              Array.from(valeur.niveau.facile.participants.entries()).map(([id, participation]) => [
+                id,
+                {
+                  reponse: participation.reponse,
+                  statut: participation.statut,
+                  reponduLe: participation.reponduLe,
+                },
+              ]),
+            ),
           },
           moyen: {
             question: valeur.niveau.moyen.question,
-            participants: Array.from(valeur.niveau.moyen.participants),
+            participants: Object.fromEntries(
+              Array.from(valeur.niveau.moyen.participants.entries()).map(([id, participation]) => [
+                id,
+                {
+                  reponse: participation.reponse,
+                  statut: participation.statut,
+                  reponduLe: participation.reponduLe,
+                },
+              ]),
+            ),
           },
           difficile: {
             question: valeur.niveau.difficile.question,
-            participants: Array.from(valeur.niveau.difficile.participants),
+            participants: Object.fromEntries(
+              Array.from(valeur.niveau.difficile.participants.entries()).map(([id, participation]) => [
+                id,
+                {
+                  reponse: participation.reponse,
+                  statut: participation.statut,
+                  reponduLe: participation.reponduLe,
+                },
+              ]),
+            ),
           },
         },
       };
@@ -165,15 +212,42 @@ export class GestionnaireQuestionsDuJour {
       const niveau: Record<NiveauQuestion, EtatQuestionDuJour> = {
         facile: {
           question: entree.niveau.facile.question,
-          participants: new Set(entree.niveau.facile.participants),
+          participants: new Map(
+            Object.entries(entree.niveau.facile.participants).map(([id, participation]) => [
+              id,
+              {
+                reponse: participation.reponse,
+                statut: participation.statut,
+                reponduLe: participation.reponduLe,
+              },
+            ]),
+          ),
         },
         moyen: {
           question: entree.niveau.moyen.question,
-          participants: new Set(entree.niveau.moyen.participants),
+          participants: new Map(
+            Object.entries(entree.niveau.moyen.participants).map(([id, participation]) => [
+              id,
+              {
+                reponse: participation.reponse,
+                statut: participation.statut,
+                reponduLe: participation.reponduLe,
+              },
+            ]),
+          ),
         },
         difficile: {
           question: entree.niveau.difficile.question,
-          participants: new Set(entree.niveau.difficile.participants),
+          participants: new Map(
+            Object.entries(entree.niveau.difficile.participants).map(([id, participation]) => [
+              id,
+              {
+                reponse: participation.reponse,
+                statut: participation.statut,
+                reponduLe: participation.reponduLe,
+              },
+            ]),
+          ),
         },
       };
 

@@ -1,4 +1,4 @@
-import dayjs from 'dayjs';
+import dayjs from '../utils/date';
 import {
   ActionRowBuilder,
   ButtonInteraction,
@@ -61,16 +61,16 @@ export async function traiterBoutonQuestion(interaction: ButtonInteraction): Pro
     const reponse = await proposerQuestion(interaction, etat.question.question, etat.question.propositions);
 
     if (!reponse) {
-      await gererEchec(interaction, niveau, cle, session, jeu, RESULTAT_TIMEOUT);
+      await gererEchec(interaction, niveau, cle, session, jeu, RESULTAT_TIMEOUT, etat.question.reponse, null);
       return;
     }
 
     const correcte = comparerReponse(reponse, etat.question.reponse);
 
     if (correcte) {
-      await gererSucces(interaction, niveau, cle, session, jeu);
+      await gererSucces(interaction, niveau, cle, session, jeu, reponse);
     } else {
-      await gererEchec(interaction, niveau, cle, session, jeu, RESULTAT_ECHEC, etat.question.reponse);
+      await gererEchec(interaction, niveau, cle, session, jeu, RESULTAT_ECHEC, etat.question.reponse, reponse);
     }
   } catch (erreur) {
     journalPrincipal.erreur('Erreur pendant le traitement d’une question', erreur);
@@ -149,22 +149,32 @@ async function gererSucces(
   cle: string,
   session: SessionQuotidienne,
   jeu: QuestionsDuJour,
+  reponseChoisie: string,
 ): Promise<void> {
   const gestionnaire = obtenirGestionnaireQuestions();
   const serviceClassements = obtenirServiceClassements();
   const maintenant = new Date();
   const score = calculerPoints(niveau, session.creeLe, maintenant);
 
-  gestionnaire.enregistrerParticipation(dayjs(cle, 'YYYY-MM-DD').toDate(), niveau, interaction.user.id);
-  serviceClassements.ajouterScore('quotidien', interaction.user.id, score.points);
-  serviceClassements.ajouterScore('hebdomadaire', interaction.user.id, score.points);
-  serviceClassements.ajouterScore('mensuel', interaction.user.id, score.points);
-  serviceClassements.ajouterScore('global', interaction.user.id, score.points);
+  gestionnaire.enregistrerParticipation(dayjs(cle, 'YYYY-MM-DD').toDate(), niveau, interaction.user.id, {
+    reponse: reponseChoisie,
+    statut: 'correct',
+    reponduLe: dayjs(maintenant).toISOString(),
+  });
+  serviceClassements.ajouterScore('quotidien', interaction.user.id, score.points, maintenant);
+  serviceClassements.ajouterScore('hebdomadaire', interaction.user.id, score.points, maintenant);
+  serviceClassements.ajouterScore('mensuel', interaction.user.id, score.points, maintenant);
+  serviceClassements.ajouterScore('global', interaction.user.id, score.points, maintenant);
   sauvegarderClassementsActuels();
   await mettreAJourAnnonceQuestions(interaction.client, session, jeu, dayjs(cle, 'YYYY-MM-DD').toDate());
 
   await interaction.followUp({
-    embeds: [creerEmbedResultat('success', niveau, score.points)],
+    embeds: [
+      creerEmbedResultat('success', niveau, score.points, {
+        reponseUtilisateur: reponseChoisie,
+        reponseCorrecte: jeu.niveau[niveau].question.reponse,
+      }),
+    ],
     ephemeral: true,
   });
 
@@ -183,20 +193,43 @@ async function gererEchec(
   jeu: QuestionsDuJour,
   motif: typeof RESULTAT_TIMEOUT | typeof RESULTAT_ECHEC,
   reponseCorrecte?: string,
+  reponseUtilisateur: string | null = null,
 ): Promise<void> {
   const gestionnaire = obtenirGestionnaireQuestions();
-  gestionnaire.enregistrerParticipation(dayjs(cle, 'YYYY-MM-DD').toDate(), niveau, interaction.user.id);
+  gestionnaire.enregistrerParticipation(dayjs(cle, 'YYYY-MM-DD').toDate(), niveau, interaction.user.id, {
+    reponse: reponseUtilisateur,
+    statut: motif === RESULTAT_TIMEOUT ? 'timeout' : 'incorrect',
+    reponduLe: dayjs().toISOString(),
+  });
   await mettreAJourAnnonceQuestions(interaction.client, session, jeu, dayjs(cle, 'YYYY-MM-DD').toDate());
 
   const messageBase =
     motif === RESULTAT_TIMEOUT
-      ? '⏱️ Temps écoulé avant la réponse. Aucun point attribué.'
+      ? `⏱️ Temps écoulé avant la réponse. La bonne réponse était : ${reponseCorrecte ?? 'inconnue'}.`
       : `❌ Mauvaise réponse. La bonne réponse était : ${reponseCorrecte ?? 'inconnue'}.`;
 
   if (interaction.replied) {
-    await interaction.editReply({ embeds: [creerEmbedResultat(motif, niveau, 0, messageBase)], components: [] });
+    await interaction.editReply({
+      embeds: [
+        creerEmbedResultat(motif, niveau, 0, {
+          message: messageBase,
+          reponseUtilisateur,
+          reponseCorrecte,
+        }),
+      ],
+      components: [],
+    });
   } else {
-    await interaction.reply({ embeds: [creerEmbedResultat(motif, niveau, 0, messageBase)], ephemeral: true });
+    await interaction.reply({
+      embeds: [
+        creerEmbedResultat(motif, niveau, 0, {
+          message: messageBase,
+          reponseUtilisateur,
+          reponseCorrecte,
+        }),
+      ],
+      ephemeral: true,
+    });
   }
 
   const messageThread =
@@ -298,28 +331,56 @@ function creerEmbedResultat(
   motif: typeof RESULTAT_TIMEOUT | typeof RESULTAT_ECHEC | 'success',
   niveau: NiveauQuestion,
   points: number,
-  messagePersonnalise?: string,
+  options: {
+    message?: string;
+    reponseUtilisateur?: string | null;
+    reponseCorrecte?: string;
+  } = {},
 ): EmbedBuilder {
+  const { message, reponseUtilisateur, reponseCorrecte } = options;
+
   if (motif === 'success') {
-    return new EmbedBuilder()
+    const embed = new EmbedBuilder()
       .setTitle('🎉 Bravo !')
-      .setDescription(
-        `Tu as réussi la question ${niveau} et gagné **${points} points**. Continue sur ta lancée pour grimper au classement !`,
-      )
-      .setColor(0x2ecc71);
+      .setDescription(`Tu as réussi la question ${niveau} et gagné **${points} points**.`)
+      .setColor(0x2ecc71)
+      .setFooter({ text: 'Continue sur ta lancée pour grimper au classement !' });
+
+    if (reponseUtilisateur) {
+      embed.addFields({ name: 'Ta réponse', value: reponseUtilisateur });
+    }
+    if (reponseCorrecte) {
+      embed.addFields({ name: 'Réponse correcte', value: reponseCorrecte });
+    }
+    return embed;
   }
 
   if (motif === RESULTAT_TIMEOUT) {
-    return new EmbedBuilder()
+    const embed = new EmbedBuilder()
       .setTitle('⏳ Temps écoulé')
-      .setDescription(messagePersonnalise ?? 'Temps écoulé avant la réponse.')
+      .setDescription(message ?? 'Temps écoulé avant la réponse.')
       .setColor(0xf39c12)
       .setFooter({ text: 'Réessaie demain pour retenter ta chance !' });
+
+    embed.addFields({ name: 'Ta réponse', value: reponseUtilisateur ?? 'Aucune réponse enregistrée.' });
+    if (reponseCorrecte) {
+      embed.addFields({ name: 'Réponse correcte', value: reponseCorrecte });
+    }
+    return embed;
   }
 
-  return new EmbedBuilder()
+  const embed = new EmbedBuilder()
     .setTitle('💥 Mauvaise réponse')
-    .setDescription(messagePersonnalise ?? 'Ce n’était pas la bonne réponse.')
+    .setDescription(message ?? 'Ce n’était pas la bonne réponse.')
     .setColor(0xe74c3c)
     .setFooter({ text: 'Tu pourras retenter demain sur une nouvelle question.' });
+
+  if (typeof reponseUtilisateur === 'string') {
+    embed.addFields({ name: 'Ta réponse', value: reponseUtilisateur });
+  }
+  if (reponseCorrecte) {
+    embed.addFields({ name: 'Réponse correcte', value: reponseCorrecte });
+  }
+
+  return embed;
 }

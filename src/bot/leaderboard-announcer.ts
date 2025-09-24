@@ -1,4 +1,4 @@
-import dayjs from 'dayjs';
+import dayjs from '../utils/date';
 import {
   ActionRowBuilder,
   Client,
@@ -42,7 +42,7 @@ export async function annoncerClassementFinDeJournee(client: Client, date: Date 
 }
 
 export async function traiterSelectionClassement(interaction: StringSelectMenuInteraction): Promise<void> {
-  if (interaction.customId !== SELECT_CUSTOM_ID) {
+  if (!interaction.customId.startsWith(SELECT_CUSTOM_ID)) {
     return;
   }
 
@@ -57,8 +57,18 @@ export async function traiterSelectionClassement(interaction: StringSelectMenuIn
   }
 
   try {
-    const embed = genererEmbedClassement(type);
-    const menu = construireMenu(type);
+    const { ownerId, limite } = extraireParametres(interaction.customId);
+
+    if (ownerId && ownerId !== interaction.user.id) {
+      await interaction.reply({
+        content: 'Seule la personne ayant demandé ce classement peut changer la vue.',
+        ephemeral: true,
+      });
+      return;
+    }
+
+    const embed = genererEmbedClassement(type, limite);
+    const menu = construireMenu(type, { ownerId, limite });
 
     await interaction.update({
       embeds: [embed],
@@ -74,9 +84,9 @@ export async function traiterSelectionClassement(interaction: StringSelectMenuIn
   }
 }
 
-function genererEmbedClassement(type: TypeClassement): EmbedBuilder {
+export function genererEmbedClassement(type: TypeClassement, limite: number = 10): EmbedBuilder {
   const service = obtenirServiceClassements();
-  const top = service.obtenirTop(type, 10);
+  const top = service.obtenirTop(type, limite);
 
   const description =
     top.length > 0
@@ -87,7 +97,7 @@ function genererEmbedClassement(type: TypeClassement): EmbedBuilder {
     .setTitle(titreComplet(type))
     .setDescription(description)
     .setColor(0x5865f2)
-    .setFooter({ text: 'DailyTrivia' })
+    .setFooter({ text: `DailyTrivia • Top ${limite}` })
     .setTimestamp(new Date());
 }
 
@@ -121,9 +131,14 @@ function titreCourt(type: TypeClassement): string {
   }
 }
 
-function construireMenu(typeActif: TypeClassement): ActionRowBuilder<StringSelectMenuBuilder> {
+export function construireMenu(
+  typeActif: TypeClassement,
+  options: { ownerId?: string | null; limite?: number } = {},
+): ActionRowBuilder<StringSelectMenuBuilder> {
+  const { ownerId = null, limite = 10 } = options;
+  const customId = ownerId ? `${SELECT_CUSTOM_ID}|${ownerId}|${limite}` : SELECT_CUSTOM_ID;
   const menu = new StringSelectMenuBuilder()
-    .setCustomId(SELECT_CUSTOM_ID)
+    .setCustomId(customId)
     .setPlaceholder('Choisis un classement à afficher')
     .addOptions(
       TYPES.map((type) => ({
@@ -151,4 +166,18 @@ function emojiPourType(type: TypeClassement): string {
     default:
       return '🏆';
   }
+}
+
+function extraireParametres(customId: string): { ownerId: string | null; limite: number } {
+  const segments = customId.split('|');
+  if (segments[0] !== SELECT_CUSTOM_ID) {
+    return { ownerId: null, limite: 10 };
+  }
+
+  const ownerId = segments[1] ?? null;
+  const limite = segments[2] ? Number.parseInt(segments[2], 10) : 10;
+  return {
+    ownerId,
+    limite: Number.isFinite(limite) && limite > 0 ? limite : 10,
+  };
 }
