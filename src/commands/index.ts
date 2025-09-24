@@ -6,6 +6,7 @@ import { commandeQuestionDuJour } from './question-du-jour';
 import { commandeRegenererQuestions } from './regenerer-questions';
 import { commandeStatistiques } from './statistiques';
 import { commandeShowRunningConfig } from './show-running-config';
+import { commandeModifierPoints } from './modifier-points';
 import type { Commande } from './types';
 
 export const commandesDisponibles: Commande[] = [
@@ -17,4 +18,5 @@ export const commandesDisponibles: Commande[] = [
   commandeRegenererQuestions,
   commandeConfig,
   commandeShowRunningConfig,
+  commandeModifierPoints,
 ];
