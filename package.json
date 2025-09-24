@@ -1,6 +1,6 @@
 {
   "name": "dailytrivia",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "private": true,
   "description": "Bot Discord quotidien en français s’appuyant sur quizzapi.jomoreschi.fr pour diffuser des questions de culture générale et gérer les classements.",
   "main": "dist/bot/dailytrivia.js",
@@ -12,7 +12,8 @@
     "lint:fix": "npm run lint -- --fix",
     "test": "jest",
     "test:watch": "jest --watch",
-    "deploy": "ts-node --project tsconfig.test.json scripts/deployer-commandes.ts"
+    "deploy": "ts-node --project tsconfig.test.json scripts/deployer-commandes.ts",
+    "clear:guild-commands": "ts-node --project tsconfig.test.json scripts/clear-guild-commands.ts"
   },
   "keywords": [
     "discord",

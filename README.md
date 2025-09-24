@@ -17,7 +17,7 @@ Bot Discord (Node/TypeScript) qui publie chaque jour les mêmes questions pour t
   - `npm test` – exécute la suite Jest.
   - `npm run lint` – ESLint + Prettier.
   - `npm run deploy` – publie les commandes slash globales.
-  - `npx ts-node --project tsconfig.test.json scripts/clear-guild-commands.ts` – (optionnel) purge les anciennes commandes spécifiques à un serveur si besoin.
+  - `npm run clear:guild-commands` – (optionnel) purge les anciennes commandes spécifiques à un serveur si besoin (utilise `DISCORD_GUILD_ID` / `EXTRA_GUILD_IDS`).
 
 ## Installation & configuration
 1. `cp .env.example .env` puis renseigner :
