@@ -72,16 +72,16 @@ export async function traiterBoutonQuestion(interaction: ButtonInteraction): Pro
     const reponse = await proposerQuestion(interaction, etat.question.question, etat.question.propositions);
 
     if (!reponse) {
-      await gererEchec(interaction, niveau, cle, session, jeu, RESULTAT_TIMEOUT, etat.question.reponse, null, guildId);
+      await gererEchec(interaction, niveau, cle, session, jeu, RESULTAT_TIMEOUT, etat.question.reponse, null);
       return;
     }
 
     const correcte = comparerReponse(reponse, etat.question.reponse);
 
     if (correcte) {
-      await gererSucces(interaction, niveau, cle, session, jeu, reponse, guildId);
+      await gererSucces(interaction, niveau, cle, session, jeu, reponse);
     } else {
-      await gererEchec(interaction, niveau, cle, session, jeu, RESULTAT_ECHEC, etat.question.reponse, reponse, guildId);
+      await gererEchec(interaction, niveau, cle, session, jeu, RESULTAT_ECHEC, etat.question.reponse, reponse);
     }
   } catch (erreur) {
     journalPrincipal.erreur('Erreur pendant le traitement d’une question', erreur);
@@ -161,26 +161,25 @@ async function gererSucces(
   session: SessionQuotidienne,
   jeu: QuestionsDuJour,
   reponseChoisie: string,
-  guildId: string,
 ): Promise<void> {
   const gestionnaire = obtenirGestionnaireQuestions();
   const serviceClassements = obtenirServiceClassements();
   const maintenant = new Date();
   const score = calculerPoints(niveau, session.creeLe, maintenant);
 
-  gestionnaire.enregistrerParticipation(dayjs(cle, 'YYYY-MM-DD').toDate(), niveau, interaction.user.id, guildId, {
+  gestionnaire.enregistrerParticipation(dayjs(cle, 'YYYY-MM-DD').toDate(), niveau, interaction.user.id, session.guildId, {
     reponse: reponseChoisie,
     statut: 'correct',
     reponduLe: dayjs(maintenant).toISOString(),
   });
 
-  const configurationGuilde = obtenirConfigurationGuilde(guildId);
+  const configurationGuilde = obtenirConfigurationGuilde(session.guildId);
   const timezone = configurationGuilde?.timezone ?? 'Europe/Paris';
 
-  serviceClassements.ajouterScore('quotidien', guildId, interaction.user.id, score.points, maintenant, timezone);
-  serviceClassements.ajouterScore('hebdomadaire', guildId, interaction.user.id, score.points, maintenant, timezone);
-  serviceClassements.ajouterScore('mensuel', guildId, interaction.user.id, score.points, maintenant, timezone);
-  serviceClassements.ajouterScore('global', guildId, interaction.user.id, score.points, maintenant, timezone);
+  serviceClassements.ajouterScore('quotidien', session.guildId, interaction.user.id, score.points, maintenant, timezone);
+  serviceClassements.ajouterScore('hebdomadaire', session.guildId, interaction.user.id, score.points, maintenant, timezone);
+  serviceClassements.ajouterScore('mensuel', session.guildId, interaction.user.id, score.points, maintenant, timezone);
+  serviceClassements.ajouterScore('global', session.guildId, interaction.user.id, score.points, maintenant, timezone);
   sauvegarderClassementsActuels();
   await mettreAJourAnnonceQuestions(interaction.client, session, jeu, dayjs(cle, 'YYYY-MM-DD').toDate());
 
@@ -210,17 +209,14 @@ async function gererEchec(
   motif: typeof RESULTAT_TIMEOUT | typeof RESULTAT_ECHEC,
   reponseCorrecte?: string,
   reponseUtilisateur: string | null = null,
-  guildId?: string,
 ): Promise<void> {
   const gestionnaire = obtenirGestionnaireQuestions();
   const horodatage = dayjs().toISOString();
-  if (guildId) {
-    gestionnaire.enregistrerParticipation(dayjs(cle, 'YYYY-MM-DD').toDate(), niveau, interaction.user.id, guildId, {
-      reponse: reponseUtilisateur,
-      statut: motif === RESULTAT_TIMEOUT ? 'timeout' : 'incorrect',
-      reponduLe: horodatage,
-    });
-  }
+  gestionnaire.enregistrerParticipation(dayjs(cle, 'YYYY-MM-DD').toDate(), niveau, interaction.user.id, session.guildId, {
+    reponse: reponseUtilisateur,
+    statut: motif === RESULTAT_TIMEOUT ? 'timeout' : 'incorrect',
+    reponduLe: horodatage,
+  });
   await mettreAJourAnnonceQuestions(interaction.client, session, jeu, dayjs(cle, 'YYYY-MM-DD').toDate());
 
   const messageBase =
