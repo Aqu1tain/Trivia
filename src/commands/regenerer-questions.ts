@@ -8,6 +8,7 @@ import {
 } from 'discord.js';
 
 import { publierAnnonceQuotidienne } from '../bot/scheduler';
+import { obtenirConfigurationGuilde } from '../core/configuration-guildes';
 import { regenererQuestionsDuJour } from '../core/gestionnaire-questions';
 import { NIVEAUX_QUESTIONS } from '../services/questions-du-jour';
 import { journalPrincipal } from '../utils/journalisation';
@@ -33,6 +34,23 @@ export const commandeRegenererQuestions: Commande = {
     if (!interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
       await interaction.reply({
         content: 'Seuls les administrateurs peuvent régénérer les questions du jour.',
+        ephemeral: true,
+      });
+      return;
+    }
+
+    if (!interaction.guildId) {
+      await interaction.reply({
+        content: 'Cette commande doit être exécutée depuis un serveur.',
+        ephemeral: true,
+      });
+      return;
+    }
+
+    const configuration = obtenirConfigurationGuilde(interaction.guildId);
+    if (!configuration) {
+      await interaction.reply({
+        content: 'DailyTrivia n’est pas encore configuré sur ce serveur. Utilise `/configurer-dailytrivia` pour choisir le salon et l’heure.',
         ephemeral: true,
       });
       return;
@@ -76,7 +94,7 @@ export const commandeRegenererQuestions: Commande = {
 
       try {
         const jeu = await regenererQuestionsDuJour();
-        await publierAnnonceQuotidienne(interaction.client, new Date(), {
+        await publierAnnonceQuotidienne(interaction.client, configuration, new Date(), {
           questions: jeu,
           force: true,
         });

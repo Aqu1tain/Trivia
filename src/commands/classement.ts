@@ -1,6 +1,7 @@
 import { SlashCommandBuilder } from 'discord.js';
 
 import { construireMenu, genererEmbedClassement } from '../bot/leaderboard-announcer';
+import { obtenirServiceClassements } from '../core/classements';
 import { journalPrincipal } from '../utils/journalisation';
 
 import type { Commande } from './types';
@@ -42,9 +43,29 @@ export const commandeClassement: Commande = {
     const type = (interaction.options.getString('type') ?? 'global') as (typeof TYPES_DISPONIBLES)[number]['name'];
     const limite = interaction.options.getInteger('limite') ?? 10;
     const prive = interaction.options.getBoolean('prive') ?? false;
+    const guildId = interaction.guildId;
+
+    if (!guildId) {
+      await interaction.reply({
+        content: 'Cette commande doit être utilisée depuis un serveur.',
+        ephemeral: true,
+      });
+      return;
+    }
+
+    const service = obtenirServiceClassements();
     try {
-      const embed = genererEmbedClassement(type, limite);
-      const menu = construireMenu(type, { ownerId: interaction.user.id, limite });
+      const top = service.obtenirTop(type, guildId, limite);
+      if (top.length === 0) {
+        await interaction.reply({
+          content: `Aucun point enregistré pour le classement ${type}.`,
+          ephemeral: true,
+        });
+        return;
+      }
+
+      const embed = genererEmbedClassement(type, guildId, limite);
+      const menu = construireMenu(type, { ownerId: interaction.user.id, limite, guildId });
 
       await interaction.reply({
         embeds: [embed],

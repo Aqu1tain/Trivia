@@ -24,11 +24,19 @@ export const commandeMesPoints: Commande = {
         .setRequired(false),
     ),
   executer: async (interaction) => {
+    if (!interaction.guildId) {
+      await interaction.reply({
+        content: 'Cette commande doit être utilisée depuis un serveur.',
+        ephemeral: true,
+      });
+      return;
+    }
+
     const type = (interaction.options.getString('type') ?? 'global') as (typeof TYPES_DISPONIBLES)[number]['name'];
     const service = obtenirServiceClassements();
 
     try {
-      const entree = service.obtenirScoreUtilisateur(type, interaction.user.id);
+      const entree = service.obtenirScoreUtilisateur(type, interaction.guildId, interaction.user.id);
 
       if (!entree) {
         await interaction.reply({

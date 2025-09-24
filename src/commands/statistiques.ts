@@ -2,6 +2,7 @@
 import { EmbedBuilder, SlashCommandBuilder } from 'discord.js';
 import { obtenirServiceClassements } from '../core/classements';
 import { obtenirGestionnaireQuestions } from '../core/gestionnaire-questions';
+import { CLE_GUILDE_LEGACY } from '../services/questions-du-jour';
 import { type TypeClassement } from '../score/classement-service';
 import { type Commande } from './types';
 
@@ -10,11 +11,21 @@ export const commandeStatistiques: Commande = {
     .setName('statistiques')
     .setDescription('Affiche tes points et quelques statistiques utiles.'),
   executer: async (interaction) => {
+    if (!interaction.guildId) {
+      await interaction.reply({
+        content: 'Cette commande doit être utilisée depuis un serveur.',
+        ephemeral: true,
+      });
+      return;
+    }
+
     const classements = obtenirServiceClassements();
     const gestionnaire = obtenirGestionnaireQuestions();
 
     const types: TypeClassement[] = ['quotidien', 'hebdomadaire', 'mensuel', 'global'];
-    const scores = types.map((type) => classements.obtenirScoreUtilisateur(type, interaction.user.id)?.points ?? 0);
+    const scores = types.map(
+      (type) => classements.obtenirScoreUtilisateur(type, interaction.guildId!, interaction.user.id)?.points ?? 0,
+    );
 
     const [quotidien, hebdo, mensuel, global] = scores;
 
@@ -35,7 +46,11 @@ export const commandeStatistiques: Commande = {
 
     const aujourdHui = await gestionnaire.obtenirJeuPour(new Date());
     const participants = Object.fromEntries(
-      Object.entries(aujourdHui.niveau).map(([niveau, etat]) => [niveau, etat.participants.size]),
+      Object.entries(aujourdHui.niveau).map(([niveau, etat]) => {
+        const parGuilde =
+          etat.participants.get(interaction.guildId ?? '') ?? etat.participants.get(CLE_GUILDE_LEGACY) ?? new Map();
+        return [niveau, parGuilde.size];
+      }),
     );
 
     embed.addFields({

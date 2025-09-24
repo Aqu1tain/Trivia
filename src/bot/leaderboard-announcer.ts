@@ -8,7 +8,8 @@ import {
   TextChannel,
 } from 'discord.js';
 
-import { obtenirConfiguration } from '../config/environnement';
+import type { ConfigurationGuilde } from '../core/configuration-guildes';
+import { listerConfigurationsGuildes } from '../core/configuration-guildes';
 import { obtenirServiceClassements } from '../core/classements';
 import type { TypeClassement } from '../score/classement-service';
 import { journalPrincipal } from '../utils/journalisation';
@@ -17,32 +18,68 @@ const TYPES: TypeClassement[] = ['quotidien', 'hebdomadaire', 'mensuel', 'global
 const SELECT_CUSTOM_ID = 'lb-select';
 
 export async function annoncerClassementFinDeJournee(client: Client, date: Date = new Date()): Promise<void> {
-  const config = obtenirConfiguration();
-  const channel = await client.channels.fetch(config.identifiantSalonQuestions);
+  const configurations = listerConfigurationsGuildes();
+  if (configurations.length === 0) {
+    return;
+  }
+
+  for (const configuration of configurations) {
+    await publierClassementPourGuilde(client, configuration, date).catch((erreur) => {
+      journalPrincipal.erreur('Impossible de poster le classement de fin de journée', erreur, {
+        guildId: configuration.guildId,
+      });
+    });
+  }
+}
+
+async function publierClassementPourGuilde(
+  client: Client,
+  configuration: ConfigurationGuilde,
+  date: Date,
+): Promise<void> {
+  const channel = await client.channels.fetch(configuration.channelId);
   if (!channel || !(channel instanceof TextChannel)) {
     journalPrincipal.erreur('Salon introuvable pour annoncer le classement de fin de journée', {
-      channelId: config.identifiantSalonQuestions,
+      guildId: configuration.guildId,
+      channelId: configuration.channelId,
       type: channel?.type,
     });
     return;
   }
 
-  try {
-    const embed = genererEmbedClassement('quotidien');
-    const menu = construireMenu('quotidien');
+  const embed = genererEmbedClassement('quotidien', configuration.guildId);
+  const menu = construireMenu('quotidien', {
+    guildId: configuration.guildId,
+    limite: 10,
+    ownerId: null,
+  });
 
-    await channel.send({
-      content: `🏁 Classements du ${dayjs(date).format('DD/MM/YYYY')} :`,
-      embeds: [embed],
-      components: [menu],
-    });
-  } catch (erreur) {
-    journalPrincipal.erreur('Impossible de poster le classement de fin de journée', erreur);
-  }
+  await channel.send({
+    content: `🏁 Classements du ${dayjs(date).format('DD/MM/YYYY')} :`,
+    embeds: [embed],
+    components: [menu],
+  });
 }
 
 export async function traiterSelectionClassement(interaction: StringSelectMenuInteraction): Promise<void> {
   if (!interaction.customId.startsWith(SELECT_CUSTOM_ID)) {
+    return;
+  }
+
+  const { guildId, ownerId, limite } = extraireParametres(interaction.customId);
+  if (!guildId || interaction.guildId !== guildId) {
+    await interaction.reply({
+      content: 'Ce sélecteur n’est pas valide pour ce serveur.',
+      ephemeral: true,
+    });
+    return;
+  }
+
+  if (ownerId && ownerId !== interaction.user.id) {
+    await interaction.reply({
+      content: 'Seule la personne ayant demandé ce classement peut changer la vue.',
+      ephemeral: true,
+    });
     return;
   }
 
@@ -57,18 +94,8 @@ export async function traiterSelectionClassement(interaction: StringSelectMenuIn
   }
 
   try {
-    const { ownerId, limite } = extraireParametres(interaction.customId);
-
-    if (ownerId && ownerId !== interaction.user.id) {
-      await interaction.reply({
-        content: 'Seule la personne ayant demandé ce classement peut changer la vue.',
-        ephemeral: true,
-      });
-      return;
-    }
-
-    const embed = genererEmbedClassement(type, limite);
-    const menu = construireMenu(type, { ownerId, limite });
+    const embed = genererEmbedClassement(type, guildId, limite);
+    const menu = construireMenu(type, { guildId, limite, ownerId });
 
     await interaction.update({
       embeds: [embed],
@@ -84,9 +111,9 @@ export async function traiterSelectionClassement(interaction: StringSelectMenuIn
   }
 }
 
-export function genererEmbedClassement(type: TypeClassement, limite: number = 10): EmbedBuilder {
+export function genererEmbedClassement(type: TypeClassement, guildId: string, limite: number = 10): EmbedBuilder {
   const service = obtenirServiceClassements();
-  const top = service.obtenirTop(type, limite);
+  const top = service.obtenirTop(type, guildId, limite);
 
   const description =
     top.length > 0
@@ -133,10 +160,10 @@ function titreCourt(type: TypeClassement): string {
 
 export function construireMenu(
   typeActif: TypeClassement,
-  options: { ownerId?: string | null; limite?: number } = {},
+  options: { ownerId?: string | null; limite?: number; guildId: string },
 ): ActionRowBuilder<StringSelectMenuBuilder> {
-  const { ownerId = null, limite = 10 } = options;
-  const customId = ownerId ? `${SELECT_CUSTOM_ID}|${ownerId}|${limite}` : SELECT_CUSTOM_ID;
+  const { ownerId = null, limite = 10, guildId } = options;
+  const customId = [SELECT_CUSTOM_ID, guildId, ownerId ?? '', String(limite)].join('|');
   const menu = new StringSelectMenuBuilder()
     .setCustomId(customId)
     .setPlaceholder('Choisis un classement à afficher')
@@ -168,15 +195,17 @@ function emojiPourType(type: TypeClassement): string {
   }
 }
 
-function extraireParametres(customId: string): { ownerId: string | null; limite: number } {
+function extraireParametres(customId: string): { guildId: string | null; ownerId: string | null; limite: number } {
   const segments = customId.split('|');
   if (segments[0] !== SELECT_CUSTOM_ID) {
-    return { ownerId: null, limite: 10 };
+    return { guildId: null, ownerId: null, limite: 10 };
   }
 
-  const ownerId = segments[1] ?? null;
-  const limite = segments[2] ? Number.parseInt(segments[2], 10) : 10;
+  const guildId = segments[1] && segments[1].length > 0 ? segments[1] : null;
+  const ownerId = segments[2] && segments[2].length > 0 ? segments[2] : null;
+  const limite = segments[3] ? Number.parseInt(segments[3], 10) : 10;
   return {
+    guildId,
     ownerId,
     limite: Number.isFinite(limite) && limite > 0 ? limite : 10,
   };

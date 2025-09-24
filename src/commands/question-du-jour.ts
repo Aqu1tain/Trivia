@@ -1,7 +1,7 @@
 import { EmbedBuilder, SlashCommandBuilder } from 'discord.js';
 
 import { obtenirGestionnaireQuestions } from '../core/gestionnaire-questions';
-import { NIVEAUX_QUESTIONS, type StatutParticipation } from '../services/questions-du-jour';
+import { CLE_GUILDE_LEGACY, NIVEAUX_QUESTIONS, type StatutParticipation } from '../services/questions-du-jour';
 import dayjs from '../utils/date';
 import { journalPrincipal } from '../utils/journalisation';
 
@@ -15,12 +15,20 @@ export const commandeQuestionDuJour: Commande = {
     try {
       await interaction.deferReply({ ephemeral: true });
 
+      if (!interaction.guildId) {
+        await interaction.editReply({ content: 'Cette commande doit être utilisée depuis un serveur.' });
+        return;
+      }
+
       const gestionnaire = obtenirGestionnaireQuestions();
       const jeu = await gestionnaire.obtenirJeuPour(new Date());
 
       const participations = NIVEAUX_QUESTIONS.map((niveau) => ({
         niveau,
-        participation: jeu.niveau[niveau].participants.get(interaction.user.id),
+        participation: (
+          jeu.niveau[niveau].participants.get(interaction.guildId ?? '') ??
+          jeu.niveau[niveau].participants.get(CLE_GUILDE_LEGACY)
+        )?.get(interaction.user.id),
       }));
 
       const toutComplete = participations.every((entree) => entree.participation !== undefined);

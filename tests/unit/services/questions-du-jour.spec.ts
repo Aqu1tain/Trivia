@@ -44,13 +44,13 @@ describe('GestionnaireQuestionsDuJour', () => {
 
     await gestionnaire.obtenirJeuPour(date);
 
-    expect(gestionnaire.aDejaRepondu(date, 'facile', 'user1')).toBe(false);
-    gestionnaire.enregistrerParticipation(date, 'facile', 'user1', {
+    expect(gestionnaire.aDejaRepondu(date, 'facile', 'user1', 'guild')).toBe(false);
+    gestionnaire.enregistrerParticipation(date, 'facile', 'user1', 'guild', {
       reponse: 'Réponse',
       statut: 'correct',
       reponduLe: new Date().toISOString(),
     });
-    expect(gestionnaire.aDejaRepondu(date, 'facile', 'user1')).toBe(true);
+    expect(gestionnaire.aDejaRepondu(date, 'facile', 'user1', 'guild')).toBe(true);
   });
 
   it('lève une erreur si aucune question n’est renvoyée', async () => {

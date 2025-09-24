@@ -1,11 +1,13 @@
 import dayjs, { type Dayjs } from '../utils/date';
 import {
+  ChannelType,
   ChatInputCommandInteraction,
   Client,
   Collection,
   Events,
   GatewayIntentBits,
   Interaction,
+  PermissionFlagsBits,
 } from 'discord.js';
 
 import { commandesDisponibles } from '../commands';
@@ -15,6 +17,7 @@ import { traiterBoutonQuestion } from '../interactions/question-buttons';
 import { journalPrincipal } from '../utils/journalisation';
 
 import { annoncerClassementFinDeJournee, traiterSelectionClassement } from './leaderboard-announcer';
+import { enregistrerPlanificateur } from './scheduler-registry';
 import { PlanificateurAnnonceQuotidienne, estBoutonQuestion } from './scheduler';
 
 export type RegistreCommandes = Collection<string, Commande>;
@@ -44,11 +47,45 @@ export function creerClient(): Client {
       planificateur = new PlanificateurAnnonceQuotidienne(client);
       planificateur.demarrer();
     }
+    enregistrerPlanificateur(planificateur);
     demarrerPlanificationFinDeJournee(client);
   });
 
   client.on(Events.InteractionCreate, (interaction) => {
     void gererInteraction(interaction, registre);
+  });
+
+  client.on(Events.GuildCreate, async (guild) => {
+    journalPrincipal.info('Nouveau serveur rejoint', {
+      guildId: guild.id,
+      nom: guild.name,
+    });
+
+    const membre = guild.members.me;
+    const cible =
+      guild.systemChannel ??
+      guild.channels.cache
+        .filter((channel) => {
+          if (channel.type !== ChannelType.GuildText) {
+            return false;
+          }
+          if (!membre) {
+            return true;
+          }
+          const permissions = channel.permissionsFor(membre);
+          return permissions ? permissions.has(PermissionFlagsBits.SendMessages) : false;
+        })
+        .first();
+
+    if (cible && cible.isTextBased()) {
+      await cible
+        .send(
+          'Merci de m’avoir ajouté ! Utilise la commande `/config` pour choisir le salon de publication et l’heure française souhaitée.',
+        )
+        .catch(() => {
+          /* noop */
+        });
+    }
   });
 
   return client;
