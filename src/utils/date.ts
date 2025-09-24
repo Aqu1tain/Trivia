@@ -27,6 +27,13 @@ export function dayjs(date?: ConfigType, format?: string): Dayjs {
   return dayjsLib.tz(date, FUSEAU_PARIS);
 }
 
+export function dayjsDansFuseau(date: ConfigType, timezone: string, format?: string): Dayjs {
+  if (typeof format === 'string') {
+    return dayjsLib.tz(date, timezone, format);
+  }
+  return dayjsLib.tz(date, timezone);
+}
+
 export type { Dayjs };
 
 export default dayjs;

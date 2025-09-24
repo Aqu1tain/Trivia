@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 
-import type { NiveauQuestion, QuestionsSnapshot, StatutParticipation } from '../services/questions-du-jour';
+import { CLE_GUILDE_LEGACY, type NiveauQuestion, type QuestionsSnapshot, type StatutParticipation } from '../services/questions-du-jour';
 import type { QuestionTrivia } from '../services/quizzapi';
 import { journalPrincipal } from '../utils/journalisation';
 
@@ -28,19 +28,23 @@ function estStatutParticipation(valeur: unknown): valeur is StatutParticipation 
 function normaliserParticipants(
   valeur: unknown,
   repliDate: string,
-): Record<string, { reponse: string | null; statut: StatutParticipation; reponduLe: string }> {
-  const resultat: Record<string, { reponse: string | null; statut: StatutParticipation; reponduLe: string }> = {};
+): Record<string, Record<string, { reponse: string | null; statut: StatutParticipation; reponduLe: string }>> {
+  const resultat: Record<string, Record<string, { reponse: string | null; statut: StatutParticipation; reponduLe: string }>> = {};
 
   if (Array.isArray(valeur)) {
+    const participants: Record<string, { reponse: string | null; statut: StatutParticipation; reponduLe: string }> = {};
     for (const participant of valeur) {
       if (typeof participant !== 'string') {
         continue;
       }
-      resultat[participant] = {
+      participants[participant] = {
         reponse: null,
         statut: 'timeout',
         reponduLe: repliDate,
       };
+    }
+    if (Object.keys(participants).length > 0) {
+      resultat[CLE_GUILDE_LEGACY] = participants;
     }
     return resultat;
   }
@@ -49,8 +53,43 @@ function normaliserParticipants(
     return resultat;
   }
 
-  const brut = valeur as ParticipantsBruts;
-  for (const [identifiant, participation] of Object.entries(brut)) {
+  const brut = valeur as Record<string, unknown>;
+  const estLegacy = Object.values(brut).every((entree) =>
+    typeof entree === 'object' && entree !== null && !Array.isArray(entree) && 'statut' in (entree as object),
+  );
+
+  if (estLegacy) {
+    const participants = normaliserParticipantsSimples(brut as ParticipantsBruts, repliDate);
+    if (Object.keys(participants).length > 0) {
+      resultat[CLE_GUILDE_LEGACY] = participants;
+    }
+    return resultat;
+  }
+
+  for (const [guildId, participationsGuild] of Object.entries(brut)) {
+    if (typeof participationsGuild !== 'object' || participationsGuild === null) {
+      continue;
+    }
+
+    const participants = normaliserParticipantsSimples(participationsGuild as ParticipantsBruts, repliDate);
+    if (Object.keys(participants).length > 0) {
+      resultat[guildId] = participants;
+    }
+  }
+
+  return resultat;
+}
+
+function normaliserParticipantsSimples(
+  valeur: ParticipantsBruts,
+  repliDate: string,
+): Record<string, { reponse: string | null; statut: StatutParticipation; reponduLe: string }> {
+  const resultat: Record<string, { reponse: string | null; statut: StatutParticipation; reponduLe: string }> = {};
+  for (const [identifiant, participation] of Object.entries(valeur)) {
+    if (typeof participation !== 'object' || participation === null) {
+      continue;
+    }
+
     const reponse = typeof participation.reponse === 'string' ? participation.reponse : null;
     const statut = estStatutParticipation(participation.statut) ? participation.statut : 'incorrect';
     const reponduLe = typeof participation.reponduLe === 'string' ? participation.reponduLe : repliDate;
@@ -61,7 +100,6 @@ function normaliserParticipants(
       reponduLe,
     };
   }
-
   return resultat;
 }
 
@@ -175,35 +213,35 @@ function cloneQuestions(snapshot: QuestionsSnapshot): QuestionsSnapshot {
       niveau: {
         facile: {
           question: { ...entree.niveau.facile.question },
-          participants: Object.fromEntries(
-            Object.entries(entree.niveau.facile.participants).map(([id, participation]) => [
-              id,
-              { ...participation },
-            ]),
-          ),
+          participants: cloneParticipants(entree.niveau.facile.participants),
         },
         moyen: {
           question: { ...entree.niveau.moyen.question },
-          participants: Object.fromEntries(
-            Object.entries(entree.niveau.moyen.participants).map(([id, participation]) => [
-              id,
-              { ...participation },
-            ]),
-          ),
+          participants: cloneParticipants(entree.niveau.moyen.participants),
         },
         difficile: {
           question: { ...entree.niveau.difficile.question },
-          participants: Object.fromEntries(
-            Object.entries(entree.niveau.difficile.participants).map(([id, participation]) => [
-              id,
-              { ...participation },
-            ]),
-          ),
+          participants: cloneParticipants(entree.niveau.difficile.participants),
         },
       },
     };
   }
   return resultat;
+}
+
+function cloneParticipants(
+  participants: Record<string, Record<string, { reponse: string | null; statut: StatutParticipation; reponduLe: string }>>,
+): Record<string, Record<string, { reponse: string | null; statut: StatutParticipation; reponduLe: string }>> {
+  const clone: Record<string, Record<string, { reponse: string | null; statut: StatutParticipation; reponduLe: string }>> = {};
+  for (const [guildId, membres] of Object.entries(participants)) {
+    clone[guildId] = Object.fromEntries(
+      Object.entries(membres).map(([utilisateurId, participation]) => [
+        utilisateurId,
+        { ...participation },
+      ]),
+    );
+  }
+  return clone;
 }
 
 function loadState(): QuestionsSnapshot {

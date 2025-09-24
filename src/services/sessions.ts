@@ -3,6 +3,7 @@ import dayjs from '../utils/date';
 type CleQuotidienne = string;
 
 export interface SessionQuotidienne {
+  guildId: string;
   cle: CleQuotidienne;
   messageId: string;
   threadId: string;
@@ -10,29 +11,33 @@ export interface SessionQuotidienne {
   creeLe: string;
 }
 
-const sessions = new Map<CleQuotidienne, SessionQuotidienne>();
+const sessions = new Map<string, SessionQuotidienne>();
 
 export function enregistrerSession(session: SessionQuotidienne): void {
-  sessions.set(session.cle, session);
+  sessions.set(construireCle(session.guildId, session.cle), session);
 }
 
-export function obtenirSession(cle: CleQuotidienne): SessionQuotidienne | undefined {
-  return sessions.get(cle);
+export function obtenirSession(cle: CleQuotidienne, guildId: string): SessionQuotidienne | undefined {
+  return sessions.get(construireCle(guildId, cle));
 }
 
-export function obtenirSessionPourDate(date: Date): SessionQuotidienne | undefined {
+export function obtenirSessionPourDate(date: Date, guildId: string): SessionQuotidienne | undefined {
   const cle = dayjs(date).format('YYYY-MM-DD');
-  return sessions.get(cle);
+  return obtenirSession(cle, guildId);
 }
 
-export function supprimerSession(cle: CleQuotidienne): void {
-  sessions.delete(cle);
+export function supprimerSession(cle: CleQuotidienne, guildId: string): void {
+  sessions.delete(construireCle(guildId, cle));
 }
 
-export function supprimerSessionPourDate(date: Date): void {
-  supprimerSession(dayjs(date).format('YYYY-MM-DD'));
+export function supprimerSessionPourDate(date: Date, guildId: string): void {
+  supprimerSession(dayjs(date).format('YYYY-MM-DD'), guildId);
 }
 
 export function viderSessions(): void {
   sessions.clear();
+}
+
+function construireCle(guildId: string, cle: CleQuotidienne): string {
+  return `${guildId}:${cle}`;
 }

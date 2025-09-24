@@ -23,12 +23,14 @@ export function sauvegarderClassementsActuels(): void {
 
 function initialiserDepuisSnapshot(service: ServiceClassements, snapshot: ClassementsSnapshot): void {
   for (const type of TYPES_CLASSEMENT) {
-    const entreesPotentielles = snapshot[type];
-    for (const entree of entreesPotentielles) {
-      if (!estEntreeClassement(entree) || entree.points <= 0) {
-        continue;
+    const parGuild = snapshot[type] ?? {};
+    for (const [guildId, entrees] of Object.entries(parGuild)) {
+      for (const entree of entrees) {
+        if (!estEntreeClassement(entree) || entree.points <= 0) {
+          continue;
+        }
+        service.ajouterScore(type, guildId, entree.utilisateurId, entree.points, new Date(entree.derniereMiseAJour));
       }
-      service.ajouterScore(type, entree.utilisateurId, entree.points, new Date(entree.derniereMiseAJour));
     }
   }
 }

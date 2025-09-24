@@ -10,10 +10,10 @@ const CLASSEMENTS_PATH = process.env.CLASSEMENTS_STORE_PATH ?? path.join(DATA_DI
 const TYPES_CLASSEMENT: TypeClassement[] = ['quotidien', 'hebdomadaire', 'mensuel', 'global'];
 
 const DEFAULT_STATE: ClassementsSnapshot = {
-  quotidien: [],
-  hebdomadaire: [],
-  mensuel: [],
-  global: [],
+  quotidien: {},
+  hebdomadaire: {},
+  mensuel: {},
+  global: {},
 };
 
 let cache: ClassementsSnapshot | null = null;
@@ -27,10 +27,10 @@ function ensureDirectoryExists(filePath: string): void {
 
 function normaliserClassements(value: unknown): ClassementsSnapshot {
   const resultat: ClassementsSnapshot = {
-    quotidien: [],
-    hebdomadaire: [],
-    mensuel: [],
-    global: [],
+    quotidien: {},
+    hebdomadaire: {},
+    mensuel: {},
+    global: {},
   };
 
   if (typeof value !== 'object' || value === null) {
@@ -39,33 +39,44 @@ function normaliserClassements(value: unknown): ClassementsSnapshot {
 
   const brut = value as Record<string, unknown>;
   for (const type of TYPES_CLASSEMENT) {
-    const source = Array.isArray(brut[type]) ? (brut[type] as unknown[]) : [];
-    const normalises: EntreeClassement[] = [];
-
-    for (const entree of source) {
-      if (typeof entree !== 'object' || entree === null) {
-        continue;
-      }
-
-      const brutEntree = entree as Partial<EntreeClassement>;
-      if (
-        typeof brutEntree.utilisateurId !== 'string' ||
-        typeof brutEntree.points !== 'number' ||
-        Number.isNaN(brutEntree.points) ||
-        typeof brutEntree.derniereMiseAJour !== 'string'
-      ) {
-        continue;
-      }
-
-      normalises.push({
-        utilisateurId: brutEntree.utilisateurId,
-        points: brutEntree.points,
-        derniereMiseAJour: brutEntree.derniereMiseAJour,
-      });
+    const source = brut[type];
+    if (typeof source !== 'object' || source === null) {
+      continue;
     }
 
-    if (normalises.length === 0) {
-      continue;
+    const parGuild = source as Record<string, unknown>;
+    const normalises: Record<string, EntreeClassement[]> = {};
+
+    for (const [guildId, entries] of Object.entries(parGuild)) {
+      if (!Array.isArray(entries)) {
+        continue;
+      }
+
+      const liste: EntreeClassement[] = [];
+      for (const entree of entries) {
+        if (typeof entree !== 'object' || entree === null) {
+          continue;
+        }
+        const brutEntree = entree as Partial<EntreeClassement>;
+        if (
+          typeof brutEntree.utilisateurId !== 'string' ||
+          typeof brutEntree.points !== 'number' ||
+          Number.isNaN(brutEntree.points) ||
+          typeof brutEntree.derniereMiseAJour !== 'string'
+        ) {
+          continue;
+        }
+
+        liste.push({
+          utilisateurId: brutEntree.utilisateurId,
+          points: brutEntree.points,
+          derniereMiseAJour: brutEntree.derniereMiseAJour,
+        });
+      }
+
+      if (liste.length > 0) {
+        normalises[guildId] = liste;
+      }
     }
 
     resultat[type] = normalises;
@@ -76,21 +87,21 @@ function normaliserClassements(value: unknown): ClassementsSnapshot {
 
 function cloneState(state: ClassementsSnapshot): ClassementsSnapshot {
   const clone: ClassementsSnapshot = {
-    quotidien: [],
-    hebdomadaire: [],
-    mensuel: [],
-    global: [],
+    quotidien: {},
+    hebdomadaire: {},
+    mensuel: {},
+    global: {},
   };
 
   for (const type of TYPES_CLASSEMENT) {
-    const source = state[type];
-    const copie: EntreeClassement[] = [];
-    for (const entree of source) {
-      copie.push({
+    const parGuild = state[type];
+    const copie: Record<string, EntreeClassement[]> = {};
+    for (const [guildId, entries] of Object.entries(parGuild)) {
+      copie[guildId] = entries.map((entree) => ({
         utilisateurId: entree.utilisateurId,
         points: entree.points,
         derniereMiseAJour: entree.derniereMiseAJour,
-      });
+      }));
     }
     clone[type] = copie;
   }

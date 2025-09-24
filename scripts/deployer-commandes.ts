@@ -20,7 +20,7 @@ async function deployer(): Promise<void> {
     commandes.map((cmd: any) => cmd.name),
   );
 
-  await rest.put(Routes.applicationGuildCommands(identifiantClient, config.identifiantGuild), {
+  await rest.put(Routes.applicationCommands(identifiantClient), {
     body: commandes,
   });
 

@@ -1,4 +1,4 @@
-import dayjs from '../utils/date';
+import dayjs, { dayjsDansFuseau } from '../utils/date';
 import type { APIEmbed } from 'discord.js';
 import {
   ActionRowBuilder,
@@ -10,10 +10,12 @@ import {
   ThreadChannel,
 } from 'discord.js';
 
-import { obtenirConfiguration } from '../config/environnement';
+import type { ConfigurationGuilde } from '../core/configuration-guildes';
+import { listerConfigurationsGuildes } from '../core/configuration-guildes';
 import { obtenirGestionnaireQuestions } from '../core/gestionnaire-questions';
 import type { QuestionsDuJour } from '../services/questions-du-jour';
-import { NIVEAUX_QUESTIONS } from '../services/questions-du-jour';
+import { CLE_GUILDE_LEGACY, NIVEAUX_QUESTIONS } from '../services/questions-du-jour';
+import type { ParticipationQuestion } from '../services/questions-du-jour';
 import {
   enregistrerSession,
   obtenirSessionPourDate,
@@ -25,74 +27,72 @@ import { journalPrincipal } from '../utils/journalisation';
 const PREFIX_CUSTOM_ID = 'question';
 
 export class PlanificateurAnnonceQuotidienne {
-  private timer: NodeJS.Timeout | null = null;
+  private readonly timers = new Map<string, NodeJS.Timeout>();
 
   constructor(private readonly client: Client) {}
 
   public demarrer(): void {
-    this.planifierProchainCycle();
+    this.mettreAJourPlanifications();
+  }
+
+  public rafraichir(): void {
+    this.mettreAJourPlanifications();
   }
 
   public arreter(): void {
-    if (this.timer) {
-      clearTimeout(this.timer);
-      this.timer = null;
+    for (const timer of this.timers.values()) {
+      clearTimeout(timer);
+    }
+    this.timers.clear();
+  }
+
+  private mettreAJourPlanifications(): void {
+    this.arreter();
+    const configurations = listerConfigurationsGuildes();
+    if (configurations.length === 0) {
+      return;
+    }
+    for (const configuration of configurations) {
+      this.planifierPourGuilde(configuration);
     }
   }
 
-  private planifierProchainCycle(): void {
-    const delai = this.calculerDelaiMs();
-    this.timer = setTimeout(() => {
-      void this.executerCycle()
+  private planifierPourGuilde(configuration: ConfigurationGuilde): void {
+    const delai = this.calculerDelaiMs(configuration);
+    const timer = setTimeout(() => {
+      void this.executerCycle(configuration)
         .catch((erreur) => {
-          journalPrincipal.erreur('Échec lors de la diffusion quotidienne', erreur);
+          journalPrincipal.erreur('Échec lors de la diffusion quotidienne', erreur, {
+            guildId: configuration.guildId,
+          });
         })
         .finally(() => {
-          this.planifierProchainCycle();
+          this.planifierPourGuilde(configuration);
         });
     }, delai);
+    this.timers.set(configuration.guildId, timer);
   }
 
-  private calculerDelaiMs(): number {
-    if (this.doiventPublierImmediatement()) {
+  private calculerDelaiMs(configuration: ConfigurationGuilde): number {
+    const maintenant = dayjsDansFuseau(new Date(), configuration.timezone);
+    const sessionExistante = obtenirSessionPourDate(new Date(), configuration.guildId);
+
+    const cibleDuJour = maintenant
+      .hour(configuration.heureAnnonce)
+      .minute(configuration.minuteAnnonce)
+      .second(0)
+      .millisecond(0);
+
+    if (!sessionExistante && !cibleDuJour.isAfter(maintenant)) {
       return 10;
     }
 
-    const config = obtenirConfiguration();
-    const maintenant = dayjs();
-    let prochain = maintenant
-      .hour(config.heureAnnonceQuotidienne)
-      .minute(config.minuteAnnonceQuotidienne)
-      .second(0)
-      .millisecond(0);
-
-    if (!prochain.isAfter(maintenant)) {
-      prochain = prochain.add(1, 'day');
-    }
-
-    const diff = Math.max(prochain.diff(maintenant), 1);
-    return diff;
+    const prochain = cibleDuJour.isAfter(maintenant) ? cibleDuJour : cibleDuJour.add(1, 'day');
+    return Math.max(prochain.diff(maintenant), 1);
   }
 
-  private doiventPublierImmediatement(): boolean {
-    const sessionExistante = obtenirSessionPourDate(new Date());
-    if (sessionExistante) {
-      return false;
-    }
-
-    const config = obtenirConfiguration();
-    const maintenant = dayjs();
-    const horaireJour = maintenant
-      .hour(config.heureAnnonceQuotidienne)
-      .minute(config.minuteAnnonceQuotidienne)
-      .second(0)
-      .millisecond(0);
-
-    return maintenant.isAfter(horaireJour);
-  }
-
-  private async executerCycle(): Promise<void> {
-    await publierAnnonceQuotidienne(this.client);
+  private async executerCycle(configuration: ConfigurationGuilde): Promise<void> {
+    await publierAnnonceQuotidienne(this.client, configuration);
   }
 }
 
@@ -107,25 +107,27 @@ export function decomposerCustomId(customId: string): { prefix: string; niveau: 
 
 export async function publierAnnonceQuotidienne(
   client: Client,
+  configuration: ConfigurationGuilde,
   date: Date = new Date(),
   options: { questions?: QuestionsDuJour; force?: boolean } = {},
 ): Promise<void> {
   const { questions, force = false } = options;
-  const config = obtenirConfiguration();
-  const sessionExistante = obtenirSessionPourDate(date);
+  const sessionExistante = obtenirSessionPourDate(date, configuration.guildId);
   const cle = dayjs(date).format('YYYY-MM-DD');
 
   if (sessionExistante && !force) {
     journalPrincipal.info('Annonce déjà publiée pour cette journée, aucune action.', {
       cle,
+      guildId: configuration.guildId,
     });
     return;
   }
 
-  const channel = await client.channels.fetch(config.identifiantSalonQuestions);
+  const channel = await client.channels.fetch(configuration.channelId);
   if (!channel || !(channel instanceof TextChannel)) {
     journalPrincipal.erreur('Salon de questions introuvable ou de type incompatible', {
-      channelId: config.identifiantSalonQuestions,
+      guildId: configuration.guildId,
+      channelId: configuration.channelId,
       type: channel?.type,
     });
     return;
@@ -133,7 +135,7 @@ export async function publierAnnonceQuotidienne(
 
   if (force && sessionExistante) {
     await supprimerAnnonceExistante(client, sessionExistante);
-    supprimerSessionPourDate(date);
+    supprimerSessionPourDate(date, configuration.guildId);
   }
 
   const gestionnaire = obtenirGestionnaireQuestions();
@@ -148,7 +150,7 @@ export async function publierAnnonceQuotidienne(
     ),
   );
 
-  const embed = creerEmbedAnnonce(jeu, date);
+  const embed = creerEmbedAnnonce(jeu, date, configuration.guildId);
 
   const message = await channel.send({
     embeds: [embed],
@@ -161,6 +163,7 @@ export async function publierAnnonceQuotidienne(
   });
 
   enregistrerSession({
+    guildId: configuration.guildId,
     cle: jeu.cle,
     messageId: message.id,
     threadId: thread.id,
@@ -170,6 +173,7 @@ export async function publierAnnonceQuotidienne(
 
   journalPrincipal.info('Annonce quotidienne publiée', {
     cle: jeu.cle,
+    guildId: configuration.guildId,
     channelId: channel.id,
     messageId: message.id,
     threadId: thread.id,
@@ -189,16 +193,16 @@ export async function mettreAJourAnnonceQuestions(
     }
 
     const message = await canal.messages.fetch(session.messageId);
-    await message.edit({ embeds: [creerEmbedAnnonce(questions, date)] });
+    await message.edit({ embeds: [creerEmbedAnnonce(questions, date, session.guildId)] });
   } catch (erreur) {
     journalPrincipal.erreur("Impossible d'actualiser l'annonce quotidienne", erreur);
   }
 }
 
-function creerEmbedAnnonce(questions: QuestionsDuJour, date: Date): APIEmbed {
-  const participantsFacile = questions.niveau.facile.participants.size;
-  const participantsMoyen = questions.niveau.moyen.participants.size;
-  const participantsDifficile = questions.niveau.difficile.participants.size;
+function creerEmbedAnnonce(questions: QuestionsDuJour, date: Date, guildId: string): APIEmbed {
+  const participantsFacile = compterParticipants(questions.niveau.facile.participants, guildId);
+  const participantsMoyen = compterParticipants(questions.niveau.moyen.participants, guildId);
+  const participantsDifficile = compterParticipants(questions.niveau.difficile.participants, guildId);
 
   const fields: APIEmbed['fields'] = [
     {
@@ -226,6 +230,15 @@ function creerEmbedAnnonce(questions: QuestionsDuJour, date: Date): APIEmbed {
     color: 0xf1c40f,
     footer: { text: `Session du ${dayjs(date).format('DD/MM/YYYY')}` },
   };
+}
+
+function compterParticipants(
+  participantsParGuilde: Map<string, Map<string, ParticipationQuestion>>,
+  guildId: string,
+): number {
+  return (
+    participantsParGuilde.get(guildId)?.size ?? participantsParGuilde.get(CLE_GUILDE_LEGACY)?.size ?? 0
+  );
 }
 
 function emojiPourNiveau(niveau: string): string {

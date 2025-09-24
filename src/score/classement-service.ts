@@ -1,4 +1,4 @@
-import dayjs, { type Dayjs } from '../utils/date';
+import dayjs, { dayjsDansFuseau, type Dayjs } from '../utils/date';
 
 export type TypeClassement = 'quotidien' | 'hebdomadaire' | 'mensuel' | 'global';
 
@@ -8,7 +8,7 @@ export interface EntreeClassement {
   derniereMiseAJour: string;
 }
 
-export type ClassementsSnapshot = Record<TypeClassement, EntreeClassement[]>;
+export type ClassementsSnapshot = Record<TypeClassement, Record<string, EntreeClassement[]>>;
 
 const TYPES_CLASSEMENT: TypeClassement[] = ['quotidien', 'hebdomadaire', 'mensuel', 'global'];
 
@@ -16,32 +16,42 @@ interface EntreeClassementInterne extends EntreeClassement {
   periodeCle: string;
 }
 
+type ClassementParGuildes = Map<string, Map<string, EntreeClassementInterne>>;
+
 /**
  * Stockage temporaire en mémoire pour les classements. À remplacer par une base de données.
  */
 export class ServiceClassements {
-  private readonly classements: Map<TypeClassement, Map<string, EntreeClassementInterne>>;
+  private readonly classements: Map<TypeClassement, ClassementParGuildes>;
 
   constructor() {
-    this.classements = new Map<TypeClassement, Map<string, EntreeClassementInterne>>();
+    this.classements = new Map();
     for (const type of TYPES_CLASSEMENT) {
       this.classements.set(type, new Map());
     }
   }
 
-  public ajouterScore(type: TypeClassement, utilisateurId: string, points: number, date: Date = new Date()): void {
+  public ajouterScore(
+    type: TypeClassement,
+    guildId: string,
+    utilisateurId: string,
+    points: number,
+    date: Date = new Date(),
+    timezone: string = 'Europe/Paris',
+  ): void {
     const classement = this.classements.get(type);
     if (!classement) {
       throw new Error(`Classement inconnu: ${type}`);
     }
 
-    const reference = dayjs(date);
+    const reference = dayjsDansFuseau(date, timezone);
     const clePeriode = determinerClePeriode(type, reference);
-    const entreeExistante = classement.get(utilisateurId);
+    const classementGuilde = obtenirOuCreerClassementGuilde(classement, guildId);
+    const entreeExistante = classementGuilde.get(utilisateurId);
     const nouveauTotal =
       entreeExistante && entreeExistante.periodeCle === clePeriode ? entreeExistante.points + points : points;
 
-    classement.set(utilisateurId, {
+    classementGuilde.set(utilisateurId, {
       utilisateurId,
       points: nouveauTotal,
       derniereMiseAJour: reference.toISOString(),
@@ -49,39 +59,50 @@ export class ServiceClassements {
     });
   }
 
-  public obtenirTop(type: TypeClassement, limite: number = 10): EntreeClassement[] {
+  public obtenirTop(type: TypeClassement, guildId: string, limite: number = 10): EntreeClassement[] {
     const classement = this.classements.get(type);
     if (!classement) {
       return [];
     }
 
-    const cleCourante = determinerClePeriode(type, dayjs());
-    this.nettoyerAnciennesEntrees(type, cleCourante);
+    const classementGuilde = classement.get(guildId);
+    if (!classementGuilde) {
+      return [];
+    }
 
-    const entreesActives = Array.from(classement.values())
-      .filter((entree) => entree.periodeCle === cleCourante || type === 'global')
+    if (type !== 'global') {
+      const cleCourante = determinerClePeriode(type, dayjs());
+      this.nettoyerAnciennesEntrees(type, classementGuilde, cleCourante);
+    }
+
+    return Array.from(classementGuilde.values())
       .sort((a, b) => b.points - a.points)
       .slice(0, limite)
       .map(({ periodeCle: _, ...publicEntree }) => publicEntree);
-
-    return entreesActives;
   }
 
-  public obtenirScoreUtilisateur(type: TypeClassement, utilisateurId: string): EntreeClassement | null {
+  public obtenirScoreUtilisateur(type: TypeClassement, guildId: string, utilisateurId: string): EntreeClassement | null {
     const classement = this.classements.get(type);
     if (!classement) {
       return null;
     }
 
-    const cleCourante = determinerClePeriode(type, dayjs());
-    const entree = classement.get(utilisateurId);
+    const classementGuilde = classement.get(guildId);
+    if (!classementGuilde) {
+      return null;
+    }
+
+    const entree = classementGuilde.get(utilisateurId);
     if (!entree) {
       return null;
     }
 
-    if (type !== 'global' && entree.periodeCle !== cleCourante) {
-      classement.delete(utilisateurId);
-      return null;
+    if (type !== 'global') {
+      const cleCourante = determinerClePeriode(type, dayjs());
+      if (entree.periodeCle !== cleCourante) {
+        classementGuilde.delete(utilisateurId);
+        return null;
+      }
     }
 
     const { periodeCle: _, ...restant } = entree;
@@ -90,10 +111,10 @@ export class ServiceClassements {
 
   public toSnapshot(): ClassementsSnapshot {
     const snapshot: ClassementsSnapshot = {
-      quotidien: [],
-      hebdomadaire: [],
-      mensuel: [],
-      global: [],
+      quotidien: {},
+      hebdomadaire: {},
+      mensuel: {},
+      global: {},
     };
 
     for (const type of TYPES_CLASSEMENT) {
@@ -102,40 +123,58 @@ export class ServiceClassements {
         continue;
       }
 
-      const cleCourante = determinerClePeriode(type, dayjs());
-      const liste: EntreeClassement[] = [];
-      for (const entree of classement.values()) {
-        if (type !== 'global' && entree.periodeCle !== cleCourante) {
-          continue;
+      const perGuild: Record<string, EntreeClassement[]> = {};
+      for (const [guildId, classementGuilde] of classement.entries()) {
+        const cleCourante = type === 'global' ? null : determinerClePeriode(type, dayjs());
+        const liste: EntreeClassement[] = [];
+        for (const entree of classementGuilde.values()) {
+          if (cleCourante && entree.periodeCle !== cleCourante) {
+            continue;
+          }
+          liste.push({
+            utilisateurId: entree.utilisateurId,
+            points: entree.points,
+            derniereMiseAJour: entree.derniereMiseAJour,
+          });
         }
-        liste.push({
-          utilisateurId: entree.utilisateurId,
-          points: entree.points,
-          derniereMiseAJour: entree.derniereMiseAJour,
-        });
+        if (liste.length > 0) {
+          perGuild[guildId] = liste;
+        }
       }
-      snapshot[type] = liste;
+      snapshot[type] = perGuild;
     }
 
     return snapshot;
   }
 
-  private nettoyerAnciennesEntrees(type: TypeClassement, cleCourante: string): void {
+  private nettoyerAnciennesEntrees(
+    type: TypeClassement,
+    classementGuilde: Map<string, EntreeClassementInterne>,
+    cleCourante: string,
+  ): void {
     if (type === 'global') {
       return;
     }
 
-    const classement = this.classements.get(type);
-    if (!classement) {
-      return;
-    }
-
-    for (const [identifiant, entree] of classement.entries()) {
+    for (const [identifiant, entree] of classementGuilde.entries()) {
       if (entree.periodeCle !== cleCourante) {
-        classement.delete(identifiant);
+        classementGuilde.delete(identifiant);
       }
     }
   }
+}
+
+function obtenirOuCreerClassementGuilde(
+  classement: ClassementParGuildes,
+  guildId: string,
+): Map<string, EntreeClassementInterne> {
+  const existant = classement.get(guildId);
+  if (existant) {
+    return existant;
+  }
+  const nouveau = new Map<string, EntreeClassementInterne>();
+  classement.set(guildId, nouveau);
+  return nouveau;
 }
 
 function determinerClePeriode(type: TypeClassement, reference: Dayjs): string {

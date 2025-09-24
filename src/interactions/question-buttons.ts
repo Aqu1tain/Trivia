@@ -10,6 +10,7 @@ import {
 } from 'discord.js';
 
 import { mettreAJourAnnonceQuestions } from '../bot/scheduler';
+import { obtenirConfigurationGuilde } from '../core/configuration-guildes';
 import { obtenirServiceClassements, sauvegarderClassementsActuels } from '../core/classements';
 import { obtenirGestionnaireQuestions } from '../core/gestionnaire-questions';
 import type { NiveauQuestion, QuestionsDuJour } from '../services/questions-du-jour';
@@ -35,7 +36,17 @@ export async function traiterBoutonQuestion(interaction: ButtonInteraction): Pro
 
   const { niveau, cle } = analyse;
   const gestionnaire = obtenirGestionnaireQuestions();
-  const session = obtenirSession(cle);
+  const guildId = interaction.guildId;
+
+  if (!guildId) {
+    await interaction.reply({
+      content: 'Cette commande est uniquement disponible sur un serveur Discord.',
+      ephemeral: true,
+    });
+    return;
+  }
+
+  const session = obtenirSession(cle, guildId);
   const dateCible = dayjs(cle, 'YYYY-MM-DD').toDate();
 
   if (!session) {
@@ -50,7 +61,7 @@ export async function traiterBoutonQuestion(interaction: ButtonInteraction): Pro
     const jeu = await gestionnaire.obtenirJeuPour(dateCible);
     const etat = jeu.niveau[niveau];
 
-    if (gestionnaire.aDejaRepondu(dateCible, niveau, interaction.user.id)) {
+    if (gestionnaire.aDejaRepondu(dateCible, niveau, interaction.user.id, guildId)) {
       await interaction.reply({
         content: `Tu as déjà tenté la question ${niveau}. Patiente jusqu’à demain !`,
         ephemeral: true,
@@ -61,16 +72,16 @@ export async function traiterBoutonQuestion(interaction: ButtonInteraction): Pro
     const reponse = await proposerQuestion(interaction, etat.question.question, etat.question.propositions);
 
     if (!reponse) {
-      await gererEchec(interaction, niveau, cle, session, jeu, RESULTAT_TIMEOUT, etat.question.reponse, null);
+      await gererEchec(interaction, niveau, cle, session, jeu, RESULTAT_TIMEOUT, etat.question.reponse, null, guildId);
       return;
     }
 
     const correcte = comparerReponse(reponse, etat.question.reponse);
 
     if (correcte) {
-      await gererSucces(interaction, niveau, cle, session, jeu, reponse);
+      await gererSucces(interaction, niveau, cle, session, jeu, reponse, guildId);
     } else {
-      await gererEchec(interaction, niveau, cle, session, jeu, RESULTAT_ECHEC, etat.question.reponse, reponse);
+      await gererEchec(interaction, niveau, cle, session, jeu, RESULTAT_ECHEC, etat.question.reponse, reponse, guildId);
     }
   } catch (erreur) {
     journalPrincipal.erreur('Erreur pendant le traitement d’une question', erreur);
@@ -150,21 +161,26 @@ async function gererSucces(
   session: SessionQuotidienne,
   jeu: QuestionsDuJour,
   reponseChoisie: string,
+  guildId: string,
 ): Promise<void> {
   const gestionnaire = obtenirGestionnaireQuestions();
   const serviceClassements = obtenirServiceClassements();
   const maintenant = new Date();
   const score = calculerPoints(niveau, session.creeLe, maintenant);
 
-  gestionnaire.enregistrerParticipation(dayjs(cle, 'YYYY-MM-DD').toDate(), niveau, interaction.user.id, {
+  gestionnaire.enregistrerParticipation(dayjs(cle, 'YYYY-MM-DD').toDate(), niveau, interaction.user.id, guildId, {
     reponse: reponseChoisie,
     statut: 'correct',
     reponduLe: dayjs(maintenant).toISOString(),
   });
-  serviceClassements.ajouterScore('quotidien', interaction.user.id, score.points, maintenant);
-  serviceClassements.ajouterScore('hebdomadaire', interaction.user.id, score.points, maintenant);
-  serviceClassements.ajouterScore('mensuel', interaction.user.id, score.points, maintenant);
-  serviceClassements.ajouterScore('global', interaction.user.id, score.points, maintenant);
+
+  const configurationGuilde = obtenirConfigurationGuilde(guildId);
+  const timezone = configurationGuilde?.timezone ?? 'Europe/Paris';
+
+  serviceClassements.ajouterScore('quotidien', guildId, interaction.user.id, score.points, maintenant, timezone);
+  serviceClassements.ajouterScore('hebdomadaire', guildId, interaction.user.id, score.points, maintenant, timezone);
+  serviceClassements.ajouterScore('mensuel', guildId, interaction.user.id, score.points, maintenant, timezone);
+  serviceClassements.ajouterScore('global', guildId, interaction.user.id, score.points, maintenant, timezone);
   sauvegarderClassementsActuels();
   await mettreAJourAnnonceQuestions(interaction.client, session, jeu, dayjs(cle, 'YYYY-MM-DD').toDate());
 
@@ -194,13 +210,17 @@ async function gererEchec(
   motif: typeof RESULTAT_TIMEOUT | typeof RESULTAT_ECHEC,
   reponseCorrecte?: string,
   reponseUtilisateur: string | null = null,
+  guildId?: string,
 ): Promise<void> {
   const gestionnaire = obtenirGestionnaireQuestions();
-  gestionnaire.enregistrerParticipation(dayjs(cle, 'YYYY-MM-DD').toDate(), niveau, interaction.user.id, {
-    reponse: reponseUtilisateur,
-    statut: motif === RESULTAT_TIMEOUT ? 'timeout' : 'incorrect',
-    reponduLe: dayjs().toISOString(),
-  });
+  const horodatage = dayjs().toISOString();
+  if (guildId) {
+    gestionnaire.enregistrerParticipation(dayjs(cle, 'YYYY-MM-DD').toDate(), niveau, interaction.user.id, guildId, {
+      reponse: reponseUtilisateur,
+      statut: motif === RESULTAT_TIMEOUT ? 'timeout' : 'incorrect',
+      reponduLe: horodatage,
+    });
+  }
   await mettreAJourAnnonceQuestions(interaction.client, session, jeu, dayjs(cle, 'YYYY-MM-DD').toDate());
 
   const messageBase =
