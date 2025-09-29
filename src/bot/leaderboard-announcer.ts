@@ -13,6 +13,7 @@ import { listerConfigurationsGuildes } from '../core/configuration-guildes';
 import type { TypeClassement } from '../score/classement-service';
 import { dayjs } from '../utils/date';
 import { journalPrincipal } from '../utils/journalisation';
+import { normaliserEphemere } from '../utils/interactions';
 
 const TYPES: TypeClassement[] = ['quotidien', 'hebdomadaire', 'mensuel', 'global'];
 const SELECT_CUSTOM_ID = 'lb-select';
@@ -68,28 +69,34 @@ export async function traiterSelectionClassement(interaction: StringSelectMenuIn
 
   const { guildId, ownerId, limite } = extraireParametres(interaction.customId);
   if (!guildId || interaction.guildId !== guildId) {
-    await interaction.reply({
-      content: 'Ce sélecteur n’est pas valide pour ce serveur.',
-      ephemeral: true,
-    });
+    await interaction.reply(
+      normaliserEphemere({
+        content: 'Ce sélecteur n’est pas valide pour ce serveur.',
+        ephemeral: true,
+      }),
+    );
     return;
   }
 
   if (ownerId && ownerId !== interaction.user.id) {
-    await interaction.reply({
-      content: 'Seule la personne ayant demandé ce classement peut changer la vue.',
-      ephemeral: true,
-    });
+    await interaction.reply(
+      normaliserEphemere({
+        content: 'Seule la personne ayant demandé ce classement peut changer la vue.',
+        ephemeral: true,
+      }),
+    );
     return;
   }
 
   const value = interaction.values[0];
   const type = value as TypeClassement;
   if (!TYPES.includes(type)) {
-    await interaction.reply({
-      content: 'Classement inconnu.',
-      ephemeral: true,
-    });
+    await interaction.reply(
+      normaliserEphemere({
+        content: 'Classement inconnu.',
+        ephemeral: true,
+      }),
+    );
     return;
   }
 
@@ -106,7 +113,9 @@ export async function traiterSelectionClassement(interaction: StringSelectMenuIn
     if (interaction.deferred || interaction.replied) {
       await interaction.editReply({ content: "Impossible d'afficher ce classement." });
     } else {
-      await interaction.reply({ content: "Impossible d'afficher ce classement.", ephemeral: true });
+      await interaction.reply(
+        normaliserEphemere({ content: "Impossible d'afficher ce classement.", ephemeral: true }),
+      );
     }
   }
 }

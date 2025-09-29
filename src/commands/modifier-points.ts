@@ -2,6 +2,7 @@ import { PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
 
 import { obtenirServiceClassements, sauvegarderClassementsActuels } from '../core/classements';
 import { obtenirConfigurationGuilde } from '../core/configuration-guildes';
+import { normaliserEphemere } from '../utils/interactions';
 import type { TypeClassement } from '../score/classement-service';
 import { dayjs } from '../utils/date';
 
@@ -44,18 +45,22 @@ export const commandeModifierPoints: Commande = {
     .setDMPermission(false),
   executer: async (interaction) => {
     if (!interaction.guildId) {
-      await interaction.reply({
-        content: 'Commande disponible uniquement sur un serveur.',
-        ephemeral: true,
-      });
+      await interaction.reply(
+        normaliserEphemere({
+          content: 'Commande disponible uniquement sur un serveur.',
+          ephemeral: true,
+        }),
+      );
       return;
     }
 
     if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
-      await interaction.reply({
-        content: 'Seuls les responsables du serveur peuvent modifier les scores.',
-        ephemeral: true,
-      });
+      await interaction.reply(
+        normaliserEphemere({
+          content: 'Seuls les responsables du serveur peuvent modifier les scores.',
+          ephemeral: true,
+        }),
+      );
       return;
     }
 
@@ -65,10 +70,12 @@ export const commandeModifierPoints: Commande = {
     const typeChoisi = interaction.options.getString('type') as TypeClassement | null;
 
     if (valeur === null && ajout === null) {
-      await interaction.reply({
-        content: 'Indique au moins `valeur` ou `ajout` pour modifier le score.',
-        ephemeral: true,
-      });
+      await interaction.reply(
+        normaliserEphemere({
+          content: 'Indique au moins `valeur` ou `ajout` pour modifier le score.',
+          ephemeral: true,
+        }),
+      );
       return;
     }
 
@@ -94,10 +101,12 @@ export const commandeModifierPoints: Commande = {
 
     const resume = types.map((type) => `• ${typeLabel(type)}`).join('\n');
 
-    await interaction.reply({
-      content: `Points mis à jour pour <@${membre.id}> :\n${resume}`,
-      ephemeral: true,
-    });
+    await interaction.reply(
+      normaliserEphemere({
+        content: `Points mis à jour pour <@${membre.id}> :\n${resume}`,
+        ephemeral: true,
+      }),
+    );
   },
 };
 

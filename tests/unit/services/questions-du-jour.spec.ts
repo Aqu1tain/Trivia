@@ -1,5 +1,5 @@
 import { GestionnaireQuestionsDuJour } from '../../../src/services/questions-du-jour';
-import type { QuestionTrivia, QuizzApiClient } from '../../../src/services/quizzapi';
+import type { ClientTrivia, QuestionTrivia } from '../../../src/services/trivia';
 
 describe('GestionnaireQuestionsDuJour', () => {
   const questionFactory = (id: string): QuestionTrivia => ({
@@ -12,7 +12,7 @@ describe('GestionnaireQuestionsDuJour', () => {
   });
 
   it('génère et met en cache les questions par date', async () => {
-    const client: Pick<QuizzApiClient, 'recupererQuestions'> = {
+    const client: ClientTrivia = {
       recupererQuestions: jest
         .fn()
         .mockResolvedValueOnce([questionFactory('facile-1')])
@@ -31,7 +31,7 @@ describe('GestionnaireQuestionsDuJour', () => {
   });
 
   it('enregistre la participation d’un utilisateur', async () => {
-    const client: Pick<QuizzApiClient, 'recupererQuestions'> = {
+    const client: ClientTrivia = {
       recupererQuestions: jest
         .fn()
         .mockResolvedValueOnce([questionFactory('facile-1')])
@@ -54,7 +54,7 @@ describe('GestionnaireQuestionsDuJour', () => {
   });
 
   it('lève une erreur si aucune question n’est renvoyée', async () => {
-    const client: Pick<QuizzApiClient, 'recupererQuestions'> = {
+    const client: ClientTrivia = {
       recupererQuestions: jest.fn().mockResolvedValue([]),
     };
 

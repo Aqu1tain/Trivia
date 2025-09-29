@@ -1,23 +1,7 @@
 import axios, { AxiosInstance } from 'axios';
 
 import { journalPrincipal } from '../utils/journalisation';
-
-export type NiveauDifficulte = 'facile' | 'moyen' | 'difficile';
-
-export interface QuestionTrivia {
-  id: string;
-  question: string;
-  propositions: string[];
-  reponse: string;
-  categorie: string;
-  difficulte: NiveauDifficulte;
-}
-
-export interface ParametresRecherche {
-  difficulte?: NiveauDifficulte;
-  categorie?: string;
-  limite?: number;
-}
+import type { ClientTrivia, NiveauDifficulte, ParametresRecherche, QuestionTrivia } from './trivia';
 
 interface QuizzApiQuestionDto {
   id?: string;
@@ -36,7 +20,7 @@ interface QuizzApiResponse {
 /**
  * Client minimal pour interroger quizzapi.jomoreschi.fr.
  */
-export class QuizzApiClient {
+export class QuizzApiClient implements ClientTrivia {
   private readonly http: AxiosInstance;
 
   constructor(baseUrl: string) {

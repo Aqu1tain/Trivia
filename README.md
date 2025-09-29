@@ -3,7 +3,7 @@
 Bot Discord (Node/TypeScript) qui publie chaque jour les mêmes questions pour tous les membres des serveurs où il est configuré. Chaque cycle quotidien envoie automatiquement un message "Les questions du jour sont prêtes" accompagné de trois boutons `Facile`, `Moyen`, `Difficile`. Lorsqu’un membre clique sur un bouton, il dispose de 20 secondes pour répondre à la question affichée. Sans réponse dans le délai, l’essai est perdu. Tant que les questions du jour ne sont pas régénérées, aucune nouvelle tentative n’est possible pour ce niveau.
 
 ## Fonctionnalités principales
-- **Questions partagées** : trois questions (facile, moyen, difficile) identiques pour toutes et tous, récupérées via [quizzapi.jomoreschi.fr](https://quizzapi.jomoreschi.fr).
+- **Questions partagées** : trois questions (facile, moyen, difficile) identiques pour toutes et tous, servies par [Open Trivia DB](https://opentdb.com) et traduites en français via l’API DeepL.
 - **Message quotidien** : déclenché à heure fixe dans un salon configurable par serveur, création automatique d’un thread pour centraliser les résultats.
 - **Interaction bouton + timer** : 20 secondes pour répondre. Réponse correcte → attribution de points pondérés par la rapidité ; réponse incorrecte ou absence de réponse → 0 point et message dédié dans le thread.
 - **Classements** : tableaux quotidien, hebdomadaire, mensuel et global, maintenus et consultables par serveur via `/classement`, `/mes-points` ou `/statistiques`.
@@ -23,7 +23,9 @@ Bot Discord (Node/TypeScript) qui publie chaque jour les mêmes questions pour t
 1. `cp .env.example .env` puis renseigner :
    - `DISCORD_TOKEN` – token du bot.
    - `DISCORD_CLIENT_ID` – identifiant de l’application Discord.
-   - (optionnel) `QUIZZ_API_URL` si vous utilisez un endpoint différent.
+   - `DEEPL_API_KEY` – clé d’authentification pour DeepL (obligatoire avec OpenTDB).
+   - (optionnel) `TRIVIA_PROVIDER` pour basculer entre `opentdb` (par défaut) et `quizzapi`.
+   - (optionnel) `QUIZZ_API_URL` ou `OPENTDB_API_URL` si vous utilisez des endpoints alternatifs.
 2. `npm install` pour récupérer les dépendances.
 3. `npm run deploy` pour enregistrer les commandes globales auprès de Discord.
 4. `npm run dev` pour lancer le bot.

@@ -12,6 +12,7 @@ import { obtenirConfigurationGuilde } from '../core/configuration-guildes';
 import { regenererQuestionsDuJour } from '../core/gestionnaire-questions';
 import { NIVEAUX_QUESTIONS } from '../services/questions-du-jour';
 import { journalPrincipal } from '../utils/journalisation';
+import { normaliserEphemere } from '../utils/interactions';
 
 import type { Commande } from './types';
 
@@ -32,27 +33,34 @@ export const commandeRegenererQuestions: Commande = {
     .setDMPermission(false),
   executer: async (interaction) => {
     if (!interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
-      await interaction.reply({
-        content: 'Seuls les administrateurs peuvent régénérer les questions du jour.',
-        ephemeral: true,
-      });
+      await interaction.reply(
+        normaliserEphemere({
+          content: 'Seuls les administrateurs peuvent régénérer les questions du jour.',
+          ephemeral: true,
+        }),
+      );
       return;
     }
 
     if (!interaction.guildId) {
-      await interaction.reply({
-        content: 'Cette commande doit être exécutée depuis un serveur.',
-        ephemeral: true,
-      });
+      await interaction.reply(
+        normaliserEphemere({
+          content: 'Cette commande doit être exécutée depuis un serveur.',
+          ephemeral: true,
+        }),
+      );
       return;
     }
 
     const configuration = obtenirConfigurationGuilde(interaction.guildId);
     if (!configuration) {
-      await interaction.reply({
-        content: 'DailyTrivia n’est pas encore configuré sur ce serveur. Utilise `/configurer-dailytrivia` pour choisir le salon et l’heure.',
-        ephemeral: true,
-      });
+      await interaction.reply(
+        normaliserEphemere({
+          content:
+            'DailyTrivia n’est pas encore configuré sur ce serveur. Utilise `/configurer-dailytrivia` pour choisir le salon et l’heure.',
+          ephemeral: true,
+        }),
+      );
       return;
     }
 
@@ -65,12 +73,14 @@ export const commandeRegenererQuestions: Commande = {
       new ButtonBuilder().setCustomId(ID_ANNULER).setLabel('Annuler').setStyle(ButtonStyle.Secondary),
     );
 
-    const message = await interaction.reply({
-      content: 'Confirme-tu vouloir régénérer et republier les questions du jour ?',
-      components: [confirmation],
-      ephemeral: true,
-      fetchReply: true,
-    });
+    await interaction.reply(
+      normaliserEphemere({
+        content: 'Confirme-tu vouloir régénérer et republier les questions du jour ?',
+        components: [confirmation],
+        ephemeral: true,
+      }),
+    );
+    const message = await interaction.fetchReply();
 
     try {
       const choix = await message.awaitMessageComponent({

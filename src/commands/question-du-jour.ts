@@ -2,6 +2,7 @@ import { EmbedBuilder, SlashCommandBuilder } from 'discord.js';
 
 import { obtenirGestionnaireQuestions } from '../core/gestionnaire-questions';
 import { CLE_GUILDE_LEGACY, NIVEAUX_QUESTIONS, type StatutParticipation } from '../services/questions-du-jour';
+import { normaliserEphemere } from '../utils/interactions';
 import { dayjs } from '../utils/date';
 import { journalPrincipal } from '../utils/journalisation';
 
@@ -13,7 +14,7 @@ export const commandeQuestionDuJour: Commande = {
     .setDescription('Affiche la question quotidienne actuelle (facile, moyen, difficile).'),
   executer: async (interaction) => {
     try {
-      await interaction.deferReply({ ephemeral: true });
+      await interaction.deferReply(normaliserEphemere({ ephemeral: true }));
 
       if (!interaction.guildId) {
         await interaction.editReply({ content: 'Cette commande doit être utilisée depuis un serveur.' });

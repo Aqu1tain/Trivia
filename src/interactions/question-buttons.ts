@@ -17,6 +17,7 @@ import { calculerPoints } from '../services/scoring';
 import { obtenirSession, type SessionQuotidienne } from '../services/sessions';
 import { dayjs } from '../utils/date';
 import { journalPrincipal } from '../utils/journalisation';
+import { normaliserEphemere } from '../utils/interactions';
 
 interface AnalyseBouton {
   niveau: NiveauQuestion;
@@ -29,7 +30,7 @@ const RESULTAT_ECHEC = 'echec';
 export async function traiterBoutonQuestion(interaction: ButtonInteraction): Promise<void> {
   const analyse = analyserCustomId(interaction.customId);
   if (!analyse) {
-    await interaction.reply({ content: 'Commande invalide.', ephemeral: true });
+    await interaction.reply(normaliserEphemere({ content: 'Commande invalide.', ephemeral: true }));
     return;
   }
 
@@ -38,10 +39,12 @@ export async function traiterBoutonQuestion(interaction: ButtonInteraction): Pro
   const guildId = interaction.guildId;
 
   if (!guildId) {
-    await interaction.reply({
-      content: 'Cette commande est uniquement disponible sur un serveur Discord.',
-      ephemeral: true,
-    });
+    await interaction.reply(
+      normaliserEphemere({
+        content: 'Cette commande est uniquement disponible sur un serveur Discord.',
+        ephemeral: true,
+      }),
+    );
     return;
   }
 
@@ -49,10 +52,12 @@ export async function traiterBoutonQuestion(interaction: ButtonInteraction): Pro
   const dateCible = dayjs(cle, 'YYYY-MM-DD').toDate();
 
   if (!session) {
-    await interaction.reply({
-      content: 'Session introuvable ou expirée. Merci de réessayer plus tard.',
-      ephemeral: true,
-    });
+    await interaction.reply(
+      normaliserEphemere({
+        content: 'Session introuvable ou expirée. Merci de réessayer plus tard.',
+        ephemeral: true,
+      }),
+    );
     return;
   }
 
@@ -61,10 +66,12 @@ export async function traiterBoutonQuestion(interaction: ButtonInteraction): Pro
     const etat = jeu.niveau[niveau];
 
     if (gestionnaire.aDejaRepondu(dateCible, niveau, interaction.user.id, guildId)) {
-      await interaction.reply({
-        content: `Tu as déjà tenté la question ${niveau}. Patiente jusqu’à demain !`,
-        ephemeral: true,
-      });
+      await interaction.reply(
+        normaliserEphemere({
+          content: `Tu as déjà tenté la question ${niveau}. Patiente jusqu’à demain !`,
+          ephemeral: true,
+        }),
+      );
       return;
     }
 
@@ -90,10 +97,12 @@ export async function traiterBoutonQuestion(interaction: ButtonInteraction): Pro
         components: [],
       });
     } else {
-      await interaction.reply({
-        content: 'Une erreur est survenue lors de la récupération de la question.',
-        ephemeral: true,
-      });
+      await interaction.reply(
+        normaliserEphemere({
+          content: 'Une erreur est survenue lors de la récupération de la question.',
+          ephemeral: true,
+        }),
+      );
     }
   }
 }
@@ -115,12 +124,14 @@ async function proposerQuestion(
       ),
     );
 
-  const message = await interaction.reply({
-    ephemeral: true,
-    components: [new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select)],
-    embeds: [creerEmbedQuestion(question, 20)],
-    fetchReply: true,
-  });
+  await interaction.reply(
+    normaliserEphemere({
+      components: [new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select)],
+      embeds: [creerEmbedQuestion(question, 20)],
+      ephemeral: true,
+    }),
+  );
+  const message = await interaction.fetchReply();
 
   try {
     const selectionPromise = message.awaitMessageComponent({
@@ -182,15 +193,17 @@ async function gererSucces(
   sauvegarderClassementsActuels();
   await mettreAJourAnnonceQuestions(interaction.client, session, jeu, dayjs(cle, 'YYYY-MM-DD').toDate());
 
-  await interaction.followUp({
-    embeds: [
-      creerEmbedResultat('success', niveau, score.points, {
-        reponseUtilisateur: reponseChoisie,
-        reponseCorrecte: jeu.niveau[niveau].question.reponse,
-      }),
-    ],
-    ephemeral: true,
-  });
+  await interaction.followUp(
+    normaliserEphemere({
+      embeds: [
+        creerEmbedResultat('success', niveau, score.points, {
+          reponseUtilisateur: reponseChoisie,
+          reponseCorrecte: jeu.niveau[niveau].question.reponse,
+        }),
+      ],
+      ephemeral: true,
+    }),
+  );
 
   await publierDansThread(
     interaction,
@@ -235,16 +248,18 @@ async function gererEchec(
       components: [],
     });
   } else {
-    await interaction.reply({
-      embeds: [
-        creerEmbedResultat(motif, niveau, 0, {
-          message: messageBase,
-          reponseUtilisateur,
-          reponseCorrecte,
-        }),
-      ],
-      ephemeral: true,
-    });
+    await interaction.reply(
+      normaliserEphemere({
+        embeds: [
+          creerEmbedResultat(motif, niveau, 0, {
+            message: messageBase,
+            reponseUtilisateur,
+            reponseCorrecte,
+          }),
+        ],
+        ephemeral: true,
+      }),
+    );
   }
 
   const messageThread =

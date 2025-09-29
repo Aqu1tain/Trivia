@@ -2,6 +2,7 @@ import { EmbedBuilder, PermissionFlagsBits, SlashCommandBuilder } from 'discord.
 
 import { obtenirConfiguration } from '../config/environnement';
 import { obtenirConfigurationGuilde } from '../core/configuration-guildes';
+import { normaliserEphemere } from '../utils/interactions';
 import { dayjs } from '../utils/date';
 
 import type { Commande } from './types';
@@ -16,29 +17,35 @@ export const commandeShowRunningConfig: Commande = {
     .setDMPermission(false),
   executer: async (interaction) => {
     if (!interaction.guildId) {
-      await interaction.reply({
-        content: 'Cette commande doit être utilisée depuis un serveur Discord.',
-        ephemeral: true,
-      });
+      await interaction.reply(
+        normaliserEphemere({
+          content: 'Cette commande doit être utilisée depuis un serveur Discord.',
+          ephemeral: true,
+        }),
+      );
       return;
     }
 
     if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
-      await interaction.reply({
-        content: 'Seuls les responsables du serveur peuvent consulter cette configuration.',
-        ephemeral: true,
-      });
+      await interaction.reply(
+        normaliserEphemere({
+          content: 'Seuls les responsables du serveur peuvent consulter cette configuration.',
+          ephemeral: true,
+        }),
+      );
       return;
     }
 
     const configuration = obtenirConfigurationGuilde(interaction.guildId);
 
     if (!configuration) {
-      await interaction.reply({
-        content:
-          "Aucune configuration n'est enregistrée pour ce serveur. Utilise `/config` pour définir le salon et l’heure de publication.",
-        ephemeral: true,
-      });
+      await interaction.reply(
+        normaliserEphemere({
+          content:
+            "Aucune configuration n'est enregistrée pour ce serveur. Utilise `/config` pour définir le salon et l’heure de publication.",
+          ephemeral: true,
+        }),
+      );
       return;
     }
 
@@ -59,7 +66,7 @@ export const commandeShowRunningConfig: Commande = {
       })
       .setColor(0x7289da);
 
-    await interaction.reply({ embeds: [embed], ephemeral: true });
+    await interaction.reply(normaliserEphemere({ embeds: [embed], ephemeral: true }));
   },
 };
 

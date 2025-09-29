@@ -1,7 +1,7 @@
 import { dayjs } from '../utils/date';
 import { journalPrincipal } from '../utils/journalisation';
 
-import type { NiveauDifficulte, ParametresRecherche, QuestionTrivia, QuizzApiClient } from './quizzapi';
+import type { ClientTrivia, NiveauDifficulte, ParametresRecherche, QuestionTrivia } from './trivia';
 
 export type NiveauQuestion = Extract<NiveauDifficulte, 'facile' | 'moyen' | 'difficile'>;
 
@@ -49,7 +49,7 @@ export type QuestionsSnapshot = Record<string, QuestionSnapshotEntry>;
 
 export const NIVEAUX_QUESTIONS: NiveauQuestion[] = ['facile', 'moyen', 'difficile'];
 
-type ClientQuizzMinimal = Pick<QuizzApiClient, 'recupererQuestions'>;
+type ClientQuizzMinimal = ClientTrivia;
 
 export const CLE_GUILDE_LEGACY = '__legacy__';
 

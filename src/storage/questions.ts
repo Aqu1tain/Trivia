@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 
 import { CLE_GUILDE_LEGACY, type NiveauQuestion, type QuestionsSnapshot, type StatutParticipation } from '../services/questions-du-jour';
-import type { QuestionTrivia } from '../services/quizzapi';
+import type { QuestionTrivia } from '../services/trivia';
 import { journalPrincipal } from '../utils/journalisation';
 
 const DATA_DIRECTORY = process.env.DATA_STORE_DIR ?? path.join(process.cwd(), 'data');

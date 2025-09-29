@@ -1,8 +1,13 @@
 import { config as chargerVariables } from 'dotenv';
 
+export type FournisseurQuestions = 'quizzapi' | 'opentdb';
+
 export interface Configuration {
   jetonDiscord: string;
   urlApiQuizz: string;
+  urlApiOpenTdb: string;
+  fournisseurQuestions: FournisseurQuestions;
+  deeplApiKey: string;
   heureAnnonceDefaut: number;
   minuteAnnonceDefaut: number;
 }
@@ -21,6 +26,9 @@ export function obtenirConfiguration(): Configuration {
 
   const jetonDiscord = process.env.DISCORD_TOKEN ?? '';
   const urlApiQuizz = process.env.QUIZZ_API_URL ?? 'https://quizzapi.jomoreschi.fr/api/v1/';
+  const urlApiOpenTdb = process.env.OPENTDB_API_URL ?? 'https://opentdb.com';
+  const fournisseurQuestions = normaliserFournisseur(process.env.TRIVIA_PROVIDER);
+  const deeplApiKey = process.env.DEEPL_API_KEY ?? '';
   const heureAnnonceQuotidienne = Number.parseInt(process.env.DAILY_TRIGGER_HOUR ?? '9', 10);
   const minuteAnnonceQuotidienne = Number.parseInt(process.env.DAILY_TRIGGER_MINUTE ?? '0', 10);
 
@@ -28,9 +36,18 @@ export function obtenirConfiguration(): Configuration {
     throw new Error('Variable d’environnement DISCORD_TOKEN manquante.');
   }
 
+  if (fournisseurQuestions === 'opentdb' && !deeplApiKey) {
+    throw new Error(
+      'Variable d’environnement DEEPL_API_KEY manquante pour l’utilisation de OpenTDB.',
+    );
+  }
+
   configurationMemo = {
     jetonDiscord,
     urlApiQuizz,
+    urlApiOpenTdb,
+    fournisseurQuestions,
+    deeplApiKey,
     heureAnnonceDefaut: clampNombre(heureAnnonceQuotidienne, 0, 23, 9),
     minuteAnnonceDefaut: clampNombre(minuteAnnonceQuotidienne, 0, 59, 0),
   };
@@ -43,4 +60,17 @@ function clampNombre(valeur: number, min: number, max: number, fallback: number)
     return fallback;
   }
   return Math.min(Math.max(valeur, min), max);
+}
+
+function normaliserFournisseur(valeur?: string): FournisseurQuestions {
+  if (!valeur) {
+    return 'opentdb';
+  }
+
+  const normalisee = valeur.trim().toLowerCase();
+  if (normalisee === 'quizzapi') {
+    return 'quizzapi';
+  }
+
+  return 'opentdb';
 }
