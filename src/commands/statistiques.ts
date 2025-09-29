@@ -1,9 +1,8 @@
 /* eslint-disable import/order */
-import { EmbedBuilder, SlashCommandBuilder } from 'discord.js';
+import { EmbedBuilder, MessageFlags, SlashCommandBuilder } from 'discord.js';
 import { obtenirServiceClassements } from '../core/classements';
 import { obtenirGestionnaireQuestions } from '../core/gestionnaire-questions';
 import { CLE_GUILDE_LEGACY } from '../services/questions-du-jour';
-import { normaliserEphemere } from '../utils/interactions';
 import { type TypeClassement } from '../score/classement-service';
 import { type Commande } from './types';
 
@@ -13,12 +12,10 @@ export const commandeStatistiques: Commande = {
     .setDescription('Affiche tes points et quelques statistiques utiles.'),
   executer: async (interaction) => {
     if (!interaction.guildId) {
-      await interaction.reply(
-        normaliserEphemere({
-          content: 'Cette commande doit être utilisée depuis un serveur.',
-          ephemeral: true,
-        }),
-      );
+      await interaction.reply({
+        content: 'Cette commande doit être utilisée depuis un serveur.',
+        flags: MessageFlags.Ephemeral,
+      });
       return;
     }
 
@@ -62,6 +59,6 @@ export const commandeStatistiques: Commande = {
       inline: false,
     });
 
-    await interaction.reply(normaliserEphemere({ embeds: [embed], ephemeral: true }));
+    await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
   },
 };

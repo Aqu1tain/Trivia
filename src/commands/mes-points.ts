@@ -1,7 +1,6 @@
-import { EmbedBuilder, SlashCommandBuilder } from 'discord.js';
+import { EmbedBuilder, MessageFlags, SlashCommandBuilder } from 'discord.js';
 
 import { obtenirServiceClassements } from '../core/classements';
-import { normaliserEphemere } from '../utils/interactions';
 import { journalPrincipal } from '../utils/journalisation';
 
 import type { Commande } from './types';
@@ -26,12 +25,10 @@ export const commandeMesPoints: Commande = {
     ),
   executer: async (interaction) => {
     if (!interaction.guildId) {
-      await interaction.reply(
-        normaliserEphemere({
-          content: 'Cette commande doit être utilisée depuis un serveur.',
-          ephemeral: true,
-        }),
-      );
+      await interaction.reply({
+        content: 'Cette commande doit être utilisée depuis un serveur.',
+        flags: MessageFlags.Ephemeral,
+      });
       return;
     }
 
@@ -42,12 +39,10 @@ export const commandeMesPoints: Commande = {
       const entree = service.obtenirScoreUtilisateur(type, interaction.guildId, interaction.user.id);
 
       if (!entree) {
-        await interaction.reply(
-          normaliserEphemere({
-            content: `Tu n'as pas encore de points dans le classement ${type}. Participe aux questions du jour !`,
-            ephemeral: true,
-          }),
-        );
+        await interaction.reply({
+          content: `Tu n'as pas encore de points dans le classement ${type}. Participe aux questions du jour !`,
+          flags: MessageFlags.Ephemeral,
+        });
         return;
       }
 
@@ -60,15 +55,13 @@ export const commandeMesPoints: Commande = {
         )
         .setFooter({ text: 'Réponds tôt et juste pour multiplier tes gains !' });
 
-      await interaction.reply(normaliserEphemere({ embeds: [embed], ephemeral: true }));
+      await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
     } catch (erreur) {
       journalPrincipal.erreur('Erreur lors de la consultation des points utilisateur', erreur);
-      await interaction.reply(
-        normaliserEphemere({
-          content: "Impossible d'afficher tes points pour le moment.",
-          ephemeral: true,
-        }),
-      );
+      await interaction.reply({
+        content: "Impossible d'afficher tes points pour le moment.",
+        flags: MessageFlags.Ephemeral,
+      });
     }
   },
 };

@@ -1,9 +1,8 @@
-import { ChannelType, PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
+import { ChannelType, MessageFlags, PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
 
 import { obtenirPlanificateur } from '../bot/scheduler-registry';
 import { obtenirConfiguration } from '../config/environnement';
 import { definirConfigurationGuilde } from '../core/configuration-guildes';
-import { normaliserEphemere } from '../utils/interactions';
 
 import type { Commande } from './types';
 
@@ -40,33 +39,27 @@ export const commandeConfig: Commande = {
     .setDMPermission(false),
   executer: async (interaction) => {
     if (!interaction.guildId) {
-      await interaction.reply(
-        normaliserEphemere({
-          content: 'Cette commande doit être utilisée depuis un serveur.',
-          ephemeral: true,
-        }),
-      );
+      await interaction.reply({
+        content: 'Cette commande doit être utilisée depuis un serveur.',
+        flags: MessageFlags.Ephemeral,
+      });
       return;
     }
 
     if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
-      await interaction.reply(
-        normaliserEphemere({
-          content: 'Seuls les responsables du serveur peuvent configurer DailyTrivia.',
-          ephemeral: true,
-        }),
-      );
+      await interaction.reply({
+        content: 'Seuls les responsables du serveur peuvent configurer DailyTrivia.',
+        flags: MessageFlags.Ephemeral,
+      });
       return;
     }
 
     const salon = interaction.options.getChannel('salon', true);
     if (!salon || (salon.type !== ChannelType.GuildText && salon.type !== ChannelType.GuildAnnouncement)) {
-      await interaction.reply(
-        normaliserEphemere({
-          content: 'Merci de sélectionner un salon textuel du serveur.',
-          ephemeral: true,
-        }),
-      );
+      await interaction.reply({
+        content: 'Merci de sélectionner un salon textuel du serveur.',
+        flags: MessageFlags.Ephemeral,
+      });
       return;
     }
 
@@ -81,12 +74,10 @@ export const commandeConfig: Commande = {
 
     obtenirPlanificateur()?.rafraichir();
 
-    await interaction.reply(
-      normaliserEphemere({
-        content: `Configuration enregistrée ! Les questions seront publiées à ${formatHeure(heure, minute)} dans <#${salon.id}>.`,
-        ephemeral: true,
-      }),
-    );
+    await interaction.reply({
+      content: `Configuration enregistrée ! Les questions seront publiées à ${formatHeure(heure, minute)} dans <#${salon.id}>.`,
+      flags: MessageFlags.Ephemeral,
+    });
   },
 };
 

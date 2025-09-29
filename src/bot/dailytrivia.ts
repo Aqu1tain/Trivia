@@ -6,6 +6,7 @@ import {
   Events,
   GatewayIntentBits,
   Interaction,
+  MessageFlags,
   PermissionFlagsBits,
   type Guild,
 } from 'discord.js';
@@ -16,7 +17,6 @@ import { obtenirConfiguration } from '../config/environnement';
 import { traiterBoutonQuestion } from '../interactions/question-buttons';
 import { dayjs, type Dayjs } from '../utils/date';
 import { journalPrincipal } from '../utils/journalisation';
-import { normaliserEphemere } from '../utils/interactions';
 
 import { annoncerClassementFinDeJournee, traiterSelectionClassement } from './leaderboard-announcer';
 import { PlanificateurAnnonceQuotidienne, estBoutonQuestion } from './scheduler';
@@ -108,7 +108,7 @@ async function executerCommande(
     if (interaction.deferred || interaction.replied) {
       await interaction.editReply({ content: 'Une erreur est survenue.' });
     } else {
-      await interaction.reply(normaliserEphemere({ content: 'Une erreur est survenue.', ephemeral: true }));
+      await interaction.reply({ content: 'Une erreur est survenue.', flags: MessageFlags.Ephemeral });
     }
   }
 }
@@ -132,7 +132,7 @@ async function gererInteraction(interaction: Interaction, registre: RegistreComm
 
   const commande = registre.get(interaction.commandName);
   if (!commande) {
-    await interaction.reply(normaliserEphemere({ content: 'Commande inconnue.', ephemeral: true }));
+    await interaction.reply({ content: 'Commande inconnue.', flags: MessageFlags.Ephemeral });
     return;
   }
 

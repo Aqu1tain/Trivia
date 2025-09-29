@@ -1,8 +1,7 @@
-import { SlashCommandBuilder } from 'discord.js';
+import { MessageFlags, SlashCommandBuilder } from 'discord.js';
 
 import { construireMenu, genererEmbedClassement } from '../bot/leaderboard-announcer';
 import { obtenirServiceClassements } from '../core/classements';
-import { normaliserEphemere } from '../utils/interactions';
 import { journalPrincipal } from '../utils/journalisation';
 
 import type { Commande } from './types';
@@ -47,12 +46,10 @@ export const commandeClassement: Commande = {
     const guildId = interaction.guildId;
 
     if (!guildId) {
-      await interaction.reply(
-        normaliserEphemere({
-          content: 'Cette commande doit être utilisée depuis un serveur.',
-          ephemeral: true,
-        }),
-      );
+      await interaction.reply({
+        content: 'Cette commande doit être utilisée depuis un serveur.',
+        flags: MessageFlags.Ephemeral,
+      });
       return;
     }
 
@@ -60,33 +57,27 @@ export const commandeClassement: Commande = {
     try {
       const top = service.obtenirTop(type, guildId, limite);
       if (top.length === 0) {
-        await interaction.reply(
-          normaliserEphemere({
-            content: `Aucun point enregistré pour le classement ${type}.`,
-            ephemeral: true,
-          }),
-        );
+        await interaction.reply({
+          content: `Aucun point enregistré pour le classement ${type}.`,
+          flags: MessageFlags.Ephemeral,
+        });
         return;
       }
 
       const embed = genererEmbedClassement(type, guildId, limite);
       const menu = construireMenu(type, { ownerId: interaction.user.id, limite, guildId });
 
-      await interaction.reply(
-        normaliserEphemere({
-          embeds: [embed],
-          components: [menu],
-          ephemeral: prive,
-        }),
-      );
+      await interaction.reply({
+        embeds: [embed],
+        components: [menu],
+        ...(prive ? { flags: MessageFlags.Ephemeral } : {}),
+      });
     } catch (erreur) {
       journalPrincipal.erreur('Erreur lors de la consultation du classement', erreur);
-      await interaction.reply(
-        normaliserEphemere({
-          content: "Impossible d'afficher le classement pour le moment.",
-          ephemeral: true,
-        }),
-      );
+      await interaction.reply({
+        content: "Impossible d'afficher le classement pour le moment.",
+        flags: MessageFlags.Ephemeral,
+      });
     }
   },
 };
